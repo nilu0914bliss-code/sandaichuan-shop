@@ -1,14 +1,12 @@
-// ══ Firebase 設定 ══
-// 到 Firebase 控制台：專案 sandaichuan-tw → 齒輪「專案設定」→「你的應用程式」
-// → 新增「網頁應用程式 </>」→ 把它給的 firebaseConfig 內容貼進下面對應欄位。
-// 尚未填寫時，網站會以「示範模式」運作（看得到畫面、但不連資料庫）。
+// ══ Firebase 設定（sandaichuan-tw，已填妥） ══
+// 這些是前端公開資訊，放在公開 repo 沒有安全問題。
 window.FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBNGSLRNm9rinJZUuEoT7wzIZ2bSkGeBig",
+  authDomain: "sandaichuan-tw.firebaseapp.com",
+  projectId: "sandaichuan-tw",
+  storageBucket: "sandaichuan-tw.firebasestorage.app",
+  messagingSenderId: "776365493054",
+  appId: "1:776365493054:web:70818951b63dffd837ba6f"
 };
 
 // 金流開通（Blaze + Functions 部署完成）後改為 true
