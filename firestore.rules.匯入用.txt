@@ -1,0 +1,8 @@
+// ⚠ 只在「匯入商品」的幾分鐘內使用，匯入完成後立刻換回 firestore.rules 的內容！
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /products/{id} { allow read, write: if true; }
+    match /orders/{id} { allow create: if true; allow read, update, delete: if false; }
+  }
+}
