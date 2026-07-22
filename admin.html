@@ -95,6 +95,7 @@
 <body>
 <header>
   <div class="t">三代傳 · 店家後台</div>
+  <button id="btn-refresh" style="display:none;">更新</button>
   <button id="btn-logout" style="display:none;">登出</button>
 </header>
 
@@ -134,6 +135,7 @@
       <button class="tab tf" data-tf="pickup" style="flex:none;padding:8px 22px;">自取</button>
       <button class="tab tf" data-tf="delivery" style="flex:none;padding:8px 22px;">宅配</button>
     </div>
+    <div id="new-alert" onclick="this.style.display='none'" style="display:none;margin:10px 16px 0;background:#C8351F;color:#fff;padding:11px 14px;border-radius:6px;font-size:13.5px;font-weight:700;line-height:1.6;cursor:pointer;">新訂單</div>
     <div class="list" id="list"><div class="empty">載入中…</div></div>
   </div>
 
@@ -197,6 +199,7 @@ onAuthStateChanged(auth, user=>{
   $("login").style.display = user? "none":"block";
   $("main").style.display = user? "block":"none";
   $("btn-logout").style.display = user? "inline-block":"none";
+  $("btn-refresh").style.display = user? "inline-block":"none";
   if(user) startData();
 });
 $("login-form").addEventListener("submit", async e=>{
@@ -206,6 +209,7 @@ $("login-form").addEventListener("submit", async e=>{
   catch(err){ $("login-err").textContent = "登入失敗：帳號或密碼錯誤"; console.error(err); }
 });
 $("btn-logout").onclick = ()=>signOut(auth);
+$("btn-refresh").onclick = ()=>{ refetch(); toast("已更新"); };
 
 /* ── 分頁切換 ── */
 $("mt-orders").onclick = ()=>setView("orders");
@@ -268,13 +272,48 @@ function fmtTime(ts){
   const d = ts.toDate();
   return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
-let started = false;
+let started = false, knownIds = null;
+function beep(){
+  try{
+    const C = window.AudioContext || window.webkitAudioContext; if(!C) return;
+    const ctx = new C();
+    [0,0.22,0.44].forEach(t=>{
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; g.gain.value = 0.12;
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.16);
+    });
+  }catch(e){}
+}
+function onOrders(list){
+  ORDERS = list;
+  const ids = new Set(ORDERS.map(o=>o.docId));
+  if(knownIds){
+    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId));
+    if(fresh.length){
+      beep();
+      const n = fresh[0];
+      $("new-alert").innerHTML = `🔔 新訂單 ${fresh.length} 張：${n.orderNo||""} ${n.name||""}${n.type==="pickup"&&n.pickup? "（自取 "+n.pickup.market+" "+(n.pickup.slot||"")+"）":"（宅配）"}`;
+      $("new-alert").style.display = "block";
+    }
+  }
+  knownIds = ids;
+  renderOrders();
+}
+async function refetch(){
+  try{
+    const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const snap = await getDocs(query(collection(db,"orders"), orderBy("createdAt","desc")));
+    onOrders(snap.docs.map(d=>({docId:d.id, ...d.data()})));
+  }catch(e){ console.error(e); }
+}
 function startData(){
   if(started) return; started = true;
   onSnapshot(query(collection(db,"orders"), orderBy("createdAt","desc")), snap=>{
-    ORDERS = snap.docs.map(d=>({docId:d.id, ...d.data()}));
-    renderOrders();
+    onOrders(snap.docs.map(d=>({docId:d.id, ...d.data()})));
   }, err=>{ console.error(err); $("list").innerHTML = `<div class="empty">讀取訂單失敗<br>（請確認規則已更新且帳號在允許名單）</div>`; });
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refetch(); });
+  setInterval(()=>{ if(!document.hidden) refetch(); }, 5000);
   loadMenu();
   loadSettings();
 }
@@ -288,19 +327,19 @@ document.querySelectorAll(".tab[data-tf]").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tab[data-tf]").forEach(x=>x.classList.toggle("on", x.dataset.tf===tyF));
   renderOrders();
 });
-window.toggleO = i => $("o"+i).classList.toggle("open");
-window.shipOrder = async i=>{
-  const inp = $("trk"+i), v = inp.value.trim();
+window.toggleO = id => $("o-"+id).classList.toggle("open");
+window.shipOrder = async id=>{
+  const inp = $("trk-"+id), v = inp.value.trim();
   if(!v){ inp.focus(); inp.style.borderColor="#C8351F"; return; }
   try{
-    await updateDoc(doc(db,"orders",ORDERS[i].docId), {status:"shipped", track:v, shippedAt:serverTimestamp()});
+    await updateDoc(doc(db,"orders",id), {status:"shipped", track:v, shippedAt:serverTimestamp()});
     toast("已標記出貨");
   }catch(e){ console.error(e); toast("儲存失敗"); }
 };
-window.pickupDone = async i=>{
-  const o = ORDERS[i];
+window.pickupDone = async id=>{
+  const o = ORDERS.find(x=>x.docId===id) || {};
   try{
-    await updateDoc(doc(db,"orders",o.docId), {status:"picked_up", pickedAt:serverTimestamp()});
+    await updateDoc(doc(db,"orders",id), {status:"picked_up", pickedAt:serverTimestamp()});
     toast(o.payMethod==="cash"? "已取貨・現金收訖":"已標記取貨完成");
   }catch(e){ console.error(e); toast("儲存失敗"); }
 };
@@ -310,18 +349,19 @@ function renderOrders(){
   const tISO = todayStr();
   $("st-today").textContent = ORDERS.filter(o=>o.createdAt && o.createdAt.toDate && o.createdAt.toDate().toISOString().slice(0,10)===tISO).length;
 
-  const show = ORDERS.map((o,i)=>({o,i})).filter(({o})=>{
+  const show = ORDERS.map(o=>({o})).filter(({o})=>{
     const stOK = stF==="all" || (stF==="todo"&&isTodo(o)) || (stF==="wait"&&o.status==="pending_payment") || (stF==="done"&&isDone(o));
     const tyOK = tyF==="all" || o.type===tyF;
     return stOK && tyOK;
   });
   if(!show.length){ $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。</div>`; return; }
-  $("list").innerHTML = show.map(({o,i})=>{
+  $("list").innerHTML = show.map(({o})=>{
+    const id = o.docId;
     const st = ST_LABEL[o.status] || [o.status,"wait"];
     const isPk = o.type==="pickup";
     const pkToday = isPk && o.pickup && o.pickup.date===todayStr();
-    return `<div class="order" id="o${i}">
-      <div class="o-head" onclick="toggleO(${i})">
+    return `<div class="order" id="o-${id}">
+      <div class="o-head" onclick="toggleO('${id}')">
         <div>
           <div class="no">${o.orderNo||"—"}</div>
           <div class="time">${fmtTime(o.createdAt)} · ${o.name||""}${isPk&&o.pickup? `<br><b style="color:var(--wine);">取貨：${o.pickup.market} ${(o.pickup.date||"").slice(5).replace("-","/")} ${o.pickup.slot||""}</b>`:""}</div>
@@ -342,15 +382,16 @@ function renderOrders(){
         <div class="o-sec">${isPk?"取貨資訊":"收件資訊"}</div>
         <div class="o-line"><b>${o.name||""}</b>　${o.phone||""}<br>${isPk? (o.pickup? o.pickup.market+"市場 · "+(o.pickup.date||"")+" "+(o.pickup.slot||"") : "—") : (o.store? "7-11 "+o.store.city+"・"+o.store.name : "—")}</div>
         ${o.note? `<div class="o-sec">備註</div><div class="o-line">${o.note}</div>`:""}
+        <div class="o-sec">目前狀態</div><div class="o-line">${st[0]}</div>
         <div class="o-sec">處理</div>
         ${o.status==="pending_payment"
           ? `<div class="o-line" style="color:var(--ink-soft);">等待客人完成線上付款（金流開通後自動更新）</div>`
           : isDone(o)
             ? `<div class="done-info">${o.status==="shipped"? "已出貨 · 宅配單號 "+(o.track||"") : "已取貨完成"+(o.payMethod==="cash"?" · 現金收訖":"")}</div>`
             : (o.type==="delivery"
-              ? `<div class="track"><input id="trk${i}" placeholder="輸入 7-11 冷凍交貨便單號"><button class="btn btn-w" onclick="shipOrder(${i})">標記出貨</button></div>
+              ? `<div class="track"><input id="trk-${id}" placeholder="輸入 7-11 冷凍交貨便單號"><button class="btn btn-w" onclick="shipOrder('${id}')">標記出貨</button></div>
                  <div class="hint">到 7-11 系統建立冷凍寄件後，把單號填回這裡</div>`
-              : `<button class="btn btn-w" onclick="pickupDone(${i})">${o.payMethod==="cash"? "標記已取貨・現金收訖 "+money(o.total):"標記已取貨"}</button>`)}
+              : `<button class="btn btn-w" onclick="pickupDone('${id}')">${o.payMethod==="cash"? "標記已取貨・現金收訖 "+money(o.total):"標記已取貨"}</button>`)}
       </div>
     </div>`;
   }).join("");
