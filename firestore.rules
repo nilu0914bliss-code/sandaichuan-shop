@@ -1,13 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 商品：任何人可讀（客人要看菜單），不可從前端寫（改菜單走後台，階段 2）
+
+    // ★ 店家帳號白名單：把下面的 email 換成你們實際登入後台用的帳號
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in [
+          "REPLACE_ME@example.com"
+        ];
+    }
+
+    // 商品：任何人可讀（客人看菜單）；只有店家可改
     match /products/{id} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
-    // 訂單：任何人可建立（下單），但不可讀取/修改/刪除
-    // （客人查單與後台管理在階段 2、3 加上驗證後開放）
+
+    // 店家設定：任何人可讀（客人端要看開關與公告）；只有店家可改
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 訂單：任何人可建立（下單）；只有店家可讀取與更新；不可刪除
     match /orders/{id} {
       allow create: if request.resource.data.total is number
                     && request.resource.data.total > 0
@@ -15,7 +30,8 @@ service cloud.firestore {
                     && request.resource.data.items.size() > 0
                     && request.resource.data.name is string
                     && request.resource.data.phone is string;
-      allow read, update, delete: if false;
+      allow read, update: if isAdmin();
+      allow delete: if false;
     }
   }
 }
