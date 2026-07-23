@@ -246,6 +246,7 @@
     <button class="ann-x" onclick="document.getElementById('ann-bar').style.display='none'">✕</button>
     <div class="ann-t">店 家 公 告</div>
     <div class="ann-b" id="ann-text"></div>
+    <img id="ann-img" style="display:none;width:100%;border-radius:8px;margin-top:10px;" alt="">
   </div>
   <div class="slogan">淬鍊 — 不靠醬油上色，全靠慢火炒糖。</div>
 
@@ -573,8 +574,11 @@ const deliveryAvailable = () => SETTINGS.deliveryOpen && SETTINGS.onlinePayOpen;
 function applyShopSettings(d){
   SETTINGS = Object.assign(SETTINGS, d || {});
   const bar = $("ann-bar");
-  if(SETTINGS.annOn && SETTINGS.annText){
-    $("ann-text").innerHTML = String(SETTINGS.annText).replace(/</g,"&lt;").replace(/\n/g,"<br>");
+  if(SETTINGS.annOn && (SETTINGS.annText || SETTINGS.annImage)){
+    $("ann-text").innerHTML = String(SETTINGS.annText||"").replace(/</g,"&lt;").replace(/\n/g,"<br>");
+    const ai = $("ann-img");
+    if(SETTINGS.annImage){ ai.src = SETTINGS.annImage; ai.style.display = "block"; }
+    else { ai.style.display = "none"; }
     bar.style.display = "block";
   } else { bar.style.display = "none"; }
   applyShopUI();
@@ -727,9 +731,8 @@ async function pay(){
     saveNote = `<br><span style="font-size:12px;color:var(--ink-soft);">（示範模式：尚未連線資料庫，此單未真正儲存）</span>`;
   }
 
-  if(member){
-    MY_ORDERS.unshift({no, time:"剛剛", status:0, track:"", sauce:sauceSel,
-      items: items.map(x=>[x.name, x.qty, x.price])});
+  if(member && typeof refreshMyOrders === "function"){
+    refreshMyOrders().catch(e=>console.error(e));
   }
   if(payway !== "cash" && savedDocId && SETTINGS.onlinePayOpen){
     try{
@@ -947,6 +950,14 @@ function togglePerks(){
   const p = $("perks"); if(p) p.style.display = p.style.display==="none"? "block":"none";
 }
 function renderMember(){
+  try{ renderMemberInner(); }
+  catch(e){
+    console.error("會員頁顯示失敗", e);
+    $("member-body").innerHTML = `<div class="empty">資料載入失敗，請重新整理頁面。</div>
+      <div style="margin-top:20px;"><button class="btn btn-full btn-line" onclick="logout()">登出</button></div>`;
+  }
+}
+function renderMemberInner(){
   const b = member.birth? member.birth.replace(/-/g,"/") : "未設定";
   const lv = levelOf(member.spent), nx = nextLevelOf(member.spent);
   const pct = nx? Math.min(100, Math.round((member.spent||0)/nx.need*100)) : 100;

@@ -175,6 +175,16 @@
         <div class="mi-h"><span class="nm">首頁公告</span><span class="sw-lb" id="lb-ann"></span>
           <button class="switch" id="sw-ann"></button></div>
         <textarea id="ann-input" rows="3" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:4px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;" placeholder="例：本週六僅出攤鳳山工協"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+          <div class="ph-box" style="width:88px;height:66px;" onclick="pickAnnPhoto()">
+            <img id="ann-thumb" style="display:none;" alt="">
+            <span id="ann-plus">+<br>公告圖片</span>
+          </div>
+          <div style="flex:1;">
+            <div class="hint" style="margin:0;">選填。會顯示在客人端首頁公告下方</div>
+            <button class="btn" id="ann-rm" style="display:none;margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="removeAnnPhoto()">移除圖片</button>
+          </div>
+        </div>
       </div>
       <div class="mi">
         <div class="mi-h" style="margin-bottom:8px;"><span class="nm">公休日設定</span></div>
@@ -305,9 +315,11 @@ async function loadSettings(){
   }catch(e){ console.error(e); }
   renderSettings();
   renderOff();
+  renderAnnPhoto();
 }
 $("btn-save-set").onclick = async ()=>{
   SHOP.annText = $("ann-input").value.trim();
+  SHOP.annImage = SHOP.annImage || "";
   try{
     await setDoc(doc(db,"settings","shop"), SHOP, {merge:true});
     toast("設定已儲存");
@@ -419,7 +431,7 @@ function startData(){
       <span style="font-size:12px;">請確認此帳號有寫在 Firestore 規則的白名單中</span></div>`;
   });
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refetch(); });
-  setInterval(()=>{ if(!document.hidden) refetch(); }, 5000);
+  setInterval(()=>{ if(!document.hidden && openSet.size===0) refetch(); }, 5000);
   loadMenu();
   loadSettings();
 }
@@ -493,7 +505,13 @@ window.cancelOrder = async id=>{
     toast("訂單已取消");
   }catch(e){ console.error(e); toast("取消失敗"); }
 };
-window.toggleO = id => $("o-"+id).classList.toggle("open");
+const openSet = new Set();
+window.toggleO = id => {
+  const el = $("o-"+id);
+  if(!el) return;
+  el.classList.toggle("open");
+  if(el.classList.contains("open")) openSet.add(id); else openSet.delete(id);
+};
 /* 訂單完成時結算點數與累積消費 */
 async function settlePoints(id){
   try{
@@ -557,7 +575,7 @@ function renderOrders(){
     const st = ST_LABEL[o.status] || [o.status,"wait"];
     const isPk = o.type==="pickup";
     const pkToday = isPk && o.pickup && o.pickup.date===todayStr();
-    return `<div class="order ${isCancelled(o)?"cancelled":""}" id="o-${id}">
+    return `<div class="order ${isCancelled(o)?"cancelled":""} ${openSet.has(id)?"open":""}" id="o-${id}">
       <div class="o-head" onclick="toggleO('${id}')">
         <div>
           <div class="no">${o.orderNo||"—"}</div>
@@ -631,6 +649,54 @@ function compressImage(file, maxSide, quality){
     };
     r.onerror = rej;
     r.readAsDataURL(file);
+  });
+}
+window.pickAnnPhoto = ()=>{
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = async ()=>{
+    const f = inp.files && inp.files[0];
+    if(!f) return;
+    toast("照片處理中…");
+    try{
+      const data = await compressImageWide(f, 900, 0.62);
+      const kb = Math.round(data.length * 0.75 / 1024);
+      if(kb > 500){ toast("照片過大，請換一張"); return; }
+      SHOP.annImage = data;
+      renderAnnPhoto();
+      toast("圖片已選擇，記得按儲存設定");
+    }catch(e){ console.error(e); toast("圖片處理失敗"); }
+  };
+  inp.click();
+};
+window.removeAnnPhoto = ()=>{ SHOP.annImage = ""; renderAnnPhoto(); toast("已移除，記得按儲存設定"); };
+function renderAnnPhoto(){
+  const img = $("ann-thumb"), plus = $("ann-plus"), rm = $("ann-rm");
+  if(!img) return;
+  if(SHOP.annImage){
+    img.src = SHOP.annImage; img.style.display = "block";
+    plus.style.display = "none"; rm.style.display = "inline-block";
+  } else {
+    img.style.display = "none"; plus.style.display = "block"; rm.style.display = "none";
+  }
+}
+/* 公告圖：保留原比例、限制長邊 */
+function compressImageWide(file, maxSide, quality){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        const sc = Math.min(1, maxSide / Math.max(w, h));
+        const c = document.createElement("canvas");
+        c.width = Math.round(w*sc); c.height = Math.round(h*sc);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = rej; img.src = e.target.result;
+    };
+    r.onerror = rej; r.readAsDataURL(file);
   });
 }
 window.pickPhoto = idx=>{
