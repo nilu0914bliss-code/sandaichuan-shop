@@ -87,6 +87,10 @@
   .vr input{width:82px;padding:7px 9px;border:1px solid var(--line);border-radius:4px;font-size:14px;font-family:inherit;text-align:right;background:#fff;}
   .vr input:focus{outline:none;border-color:var(--wine);}
   .vr .u{font-size:12px;color:var(--ink-soft);}
+  .ph-box{width:74px;height:74px;border:1.5px dashed var(--line);border-radius:6px;background:var(--paper);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;
+    font-size:11px;color:var(--ink-soft);text-align:center;line-height:1.5;}
+  .ph-box img{width:100%;height:100%;object-fit:cover;display:block;}
   .save-bar{padding:8px 16px 20px;position:sticky;bottom:0;background:var(--paper);}
 
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;
@@ -599,6 +603,53 @@ function loadMenu(){
     renderMenu();
   }, err=>{ console.error(err); $("menu-body").innerHTML=`<div class="empty">讀取菜單失敗</div>`; });
 }
+/* ── 商品照片：壓縮後存入資料庫 ── */
+function compressImage(file, maxSide, quality){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        const side = Math.min(w, h);
+        const sx = (w - side)/2, sy = (h - side)/2;   /* 置中裁成正方形 */
+        const c = document.createElement("canvas");
+        c.width = c.height = maxSide;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSide, maxSide);
+        res(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = rej;
+      img.src = e.target.result;
+    };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+window.pickPhoto = idx=>{
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = async ()=>{
+    const f = inp.files && inp.files[0];
+    if(!f) return;
+    toast("照片處理中…");
+    try{
+      const data = await compressImage(f, 600, 0.62);
+      const kb = Math.round(data.length * 0.75 / 1024);
+      if(kb > 400){ toast("照片過大，請換一張"); return; }
+      await updateDoc(doc(db,"products",PRODUCTS[idx].docId), {photo: data});
+      toast("照片已更新（約 " + kb + " KB）");
+    }catch(e){ console.error(e); toast("照片上傳失敗"); }
+  };
+  inp.click();
+};
+window.removePhoto = async idx=>{
+  if(!confirm("確定移除這張照片？")) return;
+  try{
+    await updateDoc(doc(db,"products",PRODUCTS[idx].docId), {photo: ""});
+    toast("照片已移除");
+  }catch(e){ console.error(e); toast("移除失敗"); }
+};
 window.toggleItem = async idx=>{
   const p = PRODUCTS[idx];
   try{ await updateDoc(doc(db,"products",p.docId), {on: !(p.on!==false)}); toast(p.on!==false? p.n+" 已設為售完":p.n+" 已上架"); }
@@ -616,6 +667,15 @@ function renderMenu(){
         <span class="nm">${p.n}</span>
         <span class="sw-lb">${on?"販售中":"售完/下架"}</span>
         <button class="switch ${on?"on":""}" onclick="toggleItem(${idx})"></button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+        <div class="ph-box" onclick="pickPhoto(${idx})">
+          ${p.photo? `<img src="${p.photo}" alt="">` : `<span>+<br>照片</span>`}
+        </div>
+        <div style="flex:1;">
+          <div class="hint" style="margin:0;">點左側方框上傳商品照片<br>建議正方形、主體置中</div>
+          ${p.photo? `<button class="btn" style="margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="event.stopPropagation();removePhoto(${idx})">移除照片</button>`:""}
+        </div>
       </div>
       <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">
         <span class="vl" style="font-weight:700;color:var(--ink);">自取每日限量</span>
