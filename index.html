@@ -654,6 +654,10 @@ function openCheckout(){
   go("p-checkout"); setShipMethod(shipMethod); renderPtBox();
 }
 async function pay(){
+  if(shipMethod==="pickup"){
+    const em = $("f-email");
+    if(em && em.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value)) em.value = "";
+  }
   const d=new Date();
   const dayKey = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
   let seq = 0;
@@ -872,8 +876,10 @@ function logout(){
   go("p-menu");
 }
 function fillCheckout(){
-  $("f-name").value=member.name; $("f-phone").value=member.phone; $("f-email").value=member.email;
-  $("f-city").value=member.city; $("f-store").value=member.store;
+  if(!member) return;
+  $("f-name").value = member.name || "";
+  $("f-phone").value = member.phone || "";
+  if(member.email) $("f-email").value = member.email;
   $("bday-note").style.display = isBirthMonth()? "block":"none";
 }
 function clearCheckout(){ ["f-name","f-phone","f-email","f-store"].forEach(i=>$(i).value=""); $("f-city").value=""; $("bday-note").style.display="none"; }
