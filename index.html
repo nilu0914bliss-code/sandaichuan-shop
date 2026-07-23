@@ -152,6 +152,18 @@
   .step.onx::before{background:var(--wine);}
   .track-info{background:#E4EBF1;border-radius:4px;padding:10px 12px;font-size:13px;color:#3E6280;font-weight:700;margin-top:12px;text-align:center;letter-spacing:.5px;}
   .btn-line{background:transparent;border:1px solid var(--wine);color:var(--wine);}
+  .lv-card{background:linear-gradient(135deg,#7A2727,#5A1B1B);color:var(--cream);border-radius:10px;margin:12px 16px;padding:14px;}
+  .lv-top{display:flex;align-items:center;gap:10px;}
+  .lv-ic{font-size:26px;}
+  .lv-n{font-size:17px;font-weight:800;letter-spacing:3px;font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;}
+  .lv-s{font-size:11.5px;opacity:.85;margin-top:3px;line-height:1.6;}
+  .lv-more{border:1px solid var(--cream);background:none;color:var(--cream);border-radius:3px;font-size:11.5px;padding:5px 12px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  .lv-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.22);margin:10px 0 6px;overflow:hidden;}
+  .lv-bar i{display:block;height:100%;background:var(--cream);}
+  .perk{border-top:1px solid rgba(255,255,255,.18);padding:8px 0;}
+  .perk.on{background:rgba(255,255,255,.1);border-radius:6px;padding:8px 10px;}
+  .pk-n{font-size:12.5px;font-weight:700;letter-spacing:1px;}
+  .pk-l{font-size:11.5px;opacity:.85;line-height:1.8;margin-top:2px;}
   .soon{font-size:10.5px;font-weight:700;color:#B07514;background:#FCF1DC;border:1px solid #E4C98A;border-radius:2px;padding:2px 7px;margin-left:6px;letter-spacing:1px;vertical-align:middle;}
   label.dim{opacity:.5;}
   .line-login{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin:22px 0 10px;
@@ -271,13 +283,26 @@
       <div class="field"><label>取貨市場 *</label>
         <select id="f-pmarket"><option value="">請選擇</option><option>鳳山工協</option><option>三民陽明</option></select>
       </div>
-      <div class="field"><label>取貨日期 *</label><input type="date" id="f-pdate"></div>
+      <div class="field"><label>取貨日期 *</label>
+        <select id="f-pdate" onchange="renderSlots()"><option value="">請選擇</option></select>
+      </div>
       <div class="field"><label>取貨時段 *</label>
         <select id="f-ptime"><option value="">請選擇</option></select>
-        <div class="hint">營業時間 6:00–12:30，每 20 分鐘一個時段（出攤日與攤位位置以店家公告為準）</div>
+        <div class="hint">營業時間 6:00–12:30，每 20 分鐘一個時段；需保留備貨時間，僅顯示可預訂的時段。</div>
+        <div class="hint" id="slot-warn" style="display:none;color:#C8351F;font-weight:700;">今日時段已截止，請改選其他日期。</div>
       </div>
     </div>
     <div class="field"><label>備註</label><textarea id="f-note" rows="2" placeholder="其他需求（選填）"></textarea></div>
+
+    <div id="pt-box" style="display:none;">
+      <div class="f-sec">點 數 折 抵</div>
+      <div class="hint" style="margin:-2px 0 8px;">可用 <b id="pt-avail">0</b> 點，1 點折抵 1 元</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="number" id="pt-input" min="0" placeholder="0" oninput="setPt(this.value)"
+          style="flex:1;padding:11px 12px;border:1px solid var(--line);border-radius:4px;font-size:15px;font-family:inherit;background:#fff;color:var(--ink);">
+        <button type="button" class="btn btn-line" style="padding:11px 16px;" onclick="useAllPt()">全部折抵</button>
+      </div>
+    </div>
 
     <div class="f-sec">付 款 方 式</div>
     <div class="sauce" id="pay-opts"></div>
@@ -300,6 +325,7 @@
     <div class="seal">傳</div>
     <h3>訂購完成</h3>
     <span class="paid" id="done-paid">付款已自動確認</span>
+    <div id="done-points" style="display:none;margin-top:10px;font-size:13px;color:var(--gold);line-height:1.8;"></div>
     <div class="no">訂單編號：<b id="order-no"></b></div>
     <p style="margin-top:14px;" id="done-msg"></p>
     <div class="pad-btn"><button class="btn btn-full" onclick="reset()">回到商品頁</button></div>
@@ -540,15 +566,45 @@ function setShipMethod(m){
   $("f-city").required = $("f-store").required = (m==="delivery");
   $("f-pmarket").required = $("f-pdate").required = $("f-ptime").required = (m==="pickup");
   renderPayOpts();
+  renderPtBox();
   updateCkSummary();
+}
+let ptUse = 0;
+function maxPoints(){
+  const t = totals();
+  const ship = shipMethod==="pickup"? 0 : t.ship;
+  const avail = (member && (member.available ?? member.points)) || 0;
+  return Math.max(0, Math.min(avail, t.sub + ship));
+}
+function setPt(v){
+  const mx = maxPoints();
+  ptUse = Math.max(0, Math.min(mx, Math.floor(+v || 0)));
+  const inp = $("pt-input"); if(inp) inp.value = ptUse || "";
+  updateCkSummary();
+}
+function useAllPt(){ setPt(maxPoints()); }
+function renderPtBox(){
+  const box = $("pt-box"); if(!box) return;
+  const avail = (member && (member.available ?? member.points)) || 0;
+  if(!member || avail <= 0){ box.style.display = "none"; ptUse = 0; return; }
+  box.style.display = "block";
+  $("pt-avail").textContent = avail;
+  const mx = maxPoints();
+  if(ptUse > mx) setPt(mx);
 }
 function updateCkSummary(){
   const t = totals();
   const ship = shipMethod==="pickup"? 0 : t.ship;
+  const gross = t.sub + ship;
+  const use = Math.min(ptUse, gross);
+  const lv = member? levelOf(member.spent) : LEVELS[0];
+  const earn = Math.floor((gross - use) / 100) * lv.rate;
   $("ck-summary").innerHTML = `
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
     <div class="row"><span>運費</span><span>${shipMethod==="pickup"?"自取免運":(ship===0?"免運":money(ship))}</span></div>
-    <div class="row total"><span>合計</span><span>${money(t.sub+ship)}</span></div>`;
+    ${use? `<div class="row" style="color:var(--gold);"><span>點數折抵</span><span>- ${money(use)}</span></div>`:""}
+    <div class="row total"><span>應付</span><span>${money(gross-use)}</span></div>
+    ${member? `<div class="row" style="font-size:12px;color:var(--ink-soft);"><span>本單可得點數</span><span>${earn} 點</span></div>`:""}`;
 }
 let payway = "card";
 const PAY_SETS = {
@@ -575,14 +631,19 @@ function openCheckout(){
   if(!sauceSel){ const w = $("sauce-warn"); if(w) w.style.display = "block"; return; }
   if(!SETTINGS.pickupOpen && !deliveryAvailable()){ alert("目前暫停接單，造成不便請見諒。"); return; }
   applyShopUI();
-  go("p-checkout"); setShipMethod(shipMethod);
+  ptUse = 0;
+  go("p-checkout"); setShipMethod(shipMethod); renderPtBox();
 }
 async function pay(){
   const d=new Date();
   const no = "SDC" + d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0") + "-" + Math.floor(1000+Math.random()*9000);
   const tt = totals();
   const shipFee = shipMethod==="pickup"? 0 : tt.ship;
-  const grand = tt.sub + shipFee;
+  const gross = tt.sub + shipFee;
+  const ptApplied = member? Math.min(ptUse, gross) : 0;
+  const grand = gross - ptApplied;
+  const myLv = member? levelOf(member.spent) : LEVELS[0];
+  const ptEarn = Math.floor(grand / 100) * myLv.rate;
   const items = Object.entries(cart).map(([k,q])=>{
     const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
     return {name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:va.p};
@@ -593,7 +654,9 @@ async function pay(){
     status: payway==="cash" ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
     sauce:sauceSel, note:$("f-note").value.trim(),
-    items, subtotal:tt.sub, shipFee, total:grand
+    items, subtotal:tt.sub, shipFee,
+    pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
+    total: grand
   };
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
   else { order.pickup = {market:$("f-pmarket").value, date:$("f-pdate").value, slot:$("f-ptime").value}; }
@@ -640,6 +703,15 @@ async function pay(){
       alert("連線付款頁失敗，訂單已保留為待付款。");
     }
   }
+  if(member){
+    const el = $("done-points");
+    if(el){
+      el.style.display = "block";
+      el.innerHTML = (ptApplied? `本單折抵 <b>${ptApplied}</b> 點<br>`:"") +
+        `完成取貨後可獲得 <b>${ptEarn}</b> 點`;
+    }
+  }
+  ptUse = 0;
   $("order-no").textContent = no;
   $("done-paid").textContent = payway==="cash"? "訂單成立・取貨時現金付款":"訂單已成立・待付款";
   const payNote = (payway!=="cash" && !window.PAY_LIVE)
@@ -661,8 +733,39 @@ const FAKE_ORDERS = [
   {no:"SDC20260714-0823", time:"2026/07/14 19:40", status:1, track:"", sauce:"微甜辣老滷",
    items:[["甘蔗煙燻土雞（全雞）",1,500],["海帶（3 個）",2,40]]},
 ];
-const ST = [["s0","已付款"],["s1","備貨中"],["s2","已出貨"]];
+const ST_MAP = {
+  pending_payment: {t:"待付款",  c:"#C8351F", step:0},
+  confirmed_cash:  {t:"訂單成立",c:"#B07514", step:1},
+  paid:            {t:"已付款",  c:"#5A7A48", step:1},
+  shipped:         {t:"已出貨",  c:"#3E6280", step:3},
+  picked_up:       {t:"已取貨",  c:"#3E6280", step:3},
+  cancelled:       {t:"已取消",  c:"#999",    step:-1}
+};
+const stInfo = s => ST_MAP[s] || {t:s||"處理中", c:"#7A6353", step:1};
+const WD = ["日","一","二","三","四","五","六"];
+function fmtDate(iso){
+  if(!iso) return "";
+  const [y,m,d] = iso.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  return `${m}/${d}（${WD[dt.getDay()]}）`;
+}
+const STEPS = ["訂單成立","備貨中","完成"];
 
+/* ══ 會員等級 ══ */
+const LEVELS = [
+  {n:"初入江湖", icon:"🥢", need:0,     rate:1, perks:["入會送 30 點","消費集點","生日禮"]},
+  {n:"滷林高手", icon:"🍢", need:2000,  rate:1, perks:["點數 1 倍","每月會員日・闆娘小驚喜"]},
+  {n:"滷味宗師", icon:"🍖", need:6000,  rate:2, perks:["點數 2 倍","每月優惠券","新品優先試吃"]},
+  {n:"滷味霸主", icon:"👑", need:12000, rate:3, perks:["點數 3 倍","生日豪華禮","專屬活動與隱藏優惠"]}
+];
+function levelOf(spent){
+  let lv = LEVELS[0];
+  LEVELS.forEach(x=>{ if((spent||0) >= x.need) lv = x; });
+  return lv;
+}
+function nextLevelOf(spent){
+  return LEVELS.find(x=>(spent||0) < x.need) || null;
+}
 let authReady = false;
 let wasLoggedIn = false;
 try{ wasLoggedIn = localStorage.getItem("sdc_logged")==="1"; }catch(e){}
@@ -705,7 +808,8 @@ window.onMemberLogin = async (uid, m)=>{
   member = {
     uid, name: m.displayName || "會員",
     phone: m.phone || "", birth: m.birth || "",
-    pic: m.pictureUrl || "", count: 0
+    pic: m.pictureUrl || "", count: 0,
+    points: m.points || 0, spent: m.spent || 0
   };
   await refreshMyOrders();
   renderMember();
@@ -726,13 +830,21 @@ async function refreshMyOrders(){
   if(!member || !window.fbLoadOrders) return;
   const list = await window.fbLoadOrders(member.uid);
   member.count = list.length;
-  MY_ORDERS = list.map(o=>({
-    no: o.orderNo || "",
-    time: o.createdAt && o.createdAt.toDate ? (o.createdAt.toDate().getMonth()+1)+"/"+o.createdAt.toDate().getDate() : "",
-    status: o.status==="shipped"||o.status==="picked_up" ? 2 : (o.status==="paid"||o.status==="confirmed_cash" ? 1 : 0),
-    track: o.track || "", sauce: o.sauce || "",
-    items: (o.items||[]).map(x=>[x.name, x.qty, x.price])
-  }));
+  const held = list.filter(o=>!o.pointsSettled && o.status!=="cancelled")
+                   .reduce((s,o)=> s + (o.pointsUsed||0), 0);
+  member.available = Math.max(0, (member.points||0) - held);
+  MY_ORDERS = list.map(o=>{
+    const d = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
+    return {
+      no: o.orderNo || "",
+      time: d? `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}` : "",
+      raw: o.status, type: o.type, payMethod: o.payMethod,
+      pickup: o.pickup || null, store: o.store || null,
+      track: o.track || "", sauce: o.sauce || "", note: o.note || "",
+      shipFee: o.shipFee || 0, total: o.total || 0, pointsUsed: o.pointsUsed || 0,
+      items: (o.items||[]).map(x=>[x.name, x.qty, x.price])
+    };
+  });
 }
 function logout(){
   if(window.fbSignOut){ window.fbSignOut(); }
@@ -780,10 +892,14 @@ async function saveProfile(){
   closeEdit(); renderMember(); fillCheckout();
   alert("資料已更新");
 }
+function togglePerks(){
+  const p = $("perks"); if(p) p.style.display = p.style.display==="none"? "block":"none";
+}
 function renderMember(){
   const b = member.birth? member.birth.replace(/-/g,"/") : "未設定";
-  const cnts = [0,1,2].map(s=>MY_ORDERS.filter(o=>o.status===s).length);
-  const rows = MY_ORDERS.map((o,i)=>({o,i})).filter(({o})=> memFilter==="all" || o.status===memFilter);
+  const lv = levelOf(member.spent), nx = nextLevelOf(member.spent);
+  const pct = nx? Math.min(100, Math.round((member.spent||0)/nx.need*100)) : 100;
+  const rows = MY_ORDERS.map((o,i)=>({o,i}));
   $("member-body").innerHTML = `
     <div class="m-hero">
       <div class="avatar">${member.name.charAt(0)}</div>
@@ -792,10 +908,31 @@ function renderMember(){
         <div class="hp">${member.phone || "未設定手機"}</div>
       </div>
     </div>
-    <div class="stat-card">
-      <div class="stat"><div class="v">${MY_ORDERS.length} 次</div><div class="k">訂購次數</div></div>
-      <div class="stat"><div class="v">${b}</div><div class="k">生日</div></div>
+    <div class="lv-card">
+      <div class="lv-top">
+        <span class="lv-ic">${lv.icon}</span>
+        <div style="flex:1;">
+          <div class="lv-n">${lv.n}</div>
+          <div class="lv-s">累積消費 ${money(member.spent||0)}${lv.rate>1? "・點數 "+lv.rate+" 倍":""}</div>
+        </div>
+        <button class="lv-more" onclick="togglePerks()">福利</button>
+      </div>
+      ${nx? `<div class="lv-bar"><i style="width:${pct}%"></i></div>
+        <div class="lv-s">再消費 <b>${money(nx.need-(member.spent||0))}</b> 升級 ${nx.icon} ${nx.n}</div>`
+        : `<div class="lv-s">已達最高等級，感謝您的支持！</div>`}
+      <div id="perks" style="display:none;margin-top:10px;">
+        ${LEVELS.map(x=>`<div class="perk ${x.n===lv.n?"on":""}">
+          <div class="pk-n">${x.icon} ${x.n}${x.need? "（滿 "+money(x.need)+"）":"（加入會員）"}</div>
+          <div class="pk-l">${x.perks.map(p=>"・"+p).join("<br>")}</div>
+        </div>`).join("")}
+      </div>
     </div>
+    <div class="stat-card">
+      <div class="stat"><div class="v" style="color:var(--gold);">${member.available??member.points??0} 點</div><div class="k">可用點數</div></div>
+      <div class="stat"><div class="v">${MY_ORDERS.length} 次</div><div class="k">訂購次數</div></div>
+      <div class="stat"><div class="v" style="font-size:15px;">${b}</div><div class="k">生日</div></div>
+    </div>
+    <div class="hint" style="margin:-4px 16px 10px;">每消費滿 100 元累積 1 點，1 點可折抵 1 元；訂單完成後入帳。</div>
     <div id="edit-box" style="display:none;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:0 16px 12px;">
       <div class="f-sec" id="ed-title" style="margin-top:0;">修 改 會 員 資 料</div>
       <div class="field"><label>手機號碼 *</label><input type="tel" id="ed-phone" placeholder="0912-345-678">
@@ -816,60 +953,111 @@ function renderMember(){
         <span class="t">我的訂單</span>
         <button class="all" onclick="setMemFilter('all')">看全部</button>
       </div>
-      <div class="strip">
-        ${ST.map((s,si)=>`
-          <button class="sicon ${memFilter===si?"onx":""}" onclick="setMemFilter(${si})">
-            ${S_ICONS[si]}${s[1]}
-            ${cnts[si]? `<span class="cnt">${cnts[si]}</span>`:""}
-          </button>`).join("")}
-      </div>
     </div>
-    ${rows.length? rows.map(({o,i})=>`
-      <div class="o-row" onclick="openOrder(${i})">
-        <div class="l"><div class="no">${o.no}</div><div class="tm">${o.time}</div></div>
-        <span class="amt">${money(orderSum(o).total)}</span>
-        <span class="st ${ST[o.status][0]}">${ST[o.status][1]}</span>
-      </div>`).join("") : `<div class="empty">這個狀態目前沒有訂單。</div>`}
+    ${rows.length? rows.map(({o,i})=>{
+      const si = stInfo(o.raw);
+      return `<div class="o-row" onclick="openOrder(${i})">
+        <div class="l">
+          <div class="no">${o.no}</div>
+          <div class="tm">${o.time}</div>
+          <div class="tm" style="color:var(--wine);font-weight:700;">${o.type==="pickup"&&o.pickup? "自取・"+o.pickup.market+" "+fmtDate(o.pickup.date)+" "+(o.pickup.slot||"") : "宅配・7-11 "+((o.store&&o.store.name)||"")}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="amt">${money(o.total)}</div>
+          <span class="st" style="background:${si.c}1a;color:${si.c};">${si.t}</span>
+        </div>
+      </div>`;}).join("") : `<div class="empty">目前沒有訂單。</div>`}
     <div style="margin-top:20px;"><button class="btn btn-full btn-line" onclick="logout()">登出</button></div>`;
 }
 function openOrder(i){
-  const o = MY_ORDERS[i]; const t = orderSum(o);
+  const o = MY_ORDERS[i]; const si = stInfo(o.raw);
+  const payTxt = o.payMethod==="cash"? "現金（取貨時付款）" : (o.payMethod==="linepay"? "LINE Pay":"信用卡");
+  const gross = o.total + (o.pointsUsed||0);
   $("odetail-body").innerHTML = `
     <div class="m-card">
       <div class="no" style="font-weight:800;">${o.no}</div>
-      <div class="tm" style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${o.time}</div>
-      <div class="steps">
-        ${ST.map((s,si)=>`<div class="step ${si<=o.status?"onx":""}"><div class="dot"></div><div class="lb">${s[1]}</div></div>`).join("")}
+      <div class="tm" style="font-size:12px;color:var(--ink-soft);margin-top:2px;">下單時間 ${o.time}</div>
+      <div style="margin-top:10px;">
+        <span style="display:inline-block;font-size:13px;font-weight:800;padding:5px 14px;border-radius:3px;background:${si.c}1a;color:${si.c};">${si.t}</span>
       </div>
-      ${o.status===2? `<div class="track-info">宅配單號 ${o.track}<br><span style="font-size:11.5px;font-weight:400;">可至 7-11 官網查詢包裹進度</span></div>`:""}
+      ${o.raw==="pending_payment"? `<div class="hint" style="color:#C8351F;margin-top:8px;">此訂單尚未完成付款，請至結帳頁重新付款或聯繫店家。</div>`:""}
+      ${o.raw==="shipped"&&o.track? `<div class="track-info">宅配單號 ${o.track}<br><span style="font-size:11.5px;font-weight:400;">可至 7-11 官網查詢包裹進度</span></div>`:""}
     </div>
+
+    <div class="m-sec">${o.type==="pickup"? "取 貨 資 訊":"配 送 資 訊"}</div>
+    <div class="m-card" style="font-size:14px;line-height:2;">
+      ${o.type==="pickup" && o.pickup
+        ? `取貨市場　<b>${o.pickup.market||""}</b><br>取貨日期　<b>${fmtDate(o.pickup.date)}</b><br>取貨時段　<b>${o.pickup.slot||""}</b>`
+        : `配送方式　冷凍宅配（7-11 店到店）<br>取貨門市　<b>${(o.store&&o.store.city)||""}・${(o.store&&o.store.name)||""}</b><br><span style="font-size:12.5px;color:var(--ink-soft);">付款完成後 2～3 天出貨，寄達後簡訊通知</span>`}
+    </div>
+
     <div class="m-sec">訂 購 明 細</div>
     <div class="m-card">
       ${o.items.map(x=>`<div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;"><span>${x[0]} × ${x[1]}</span><span>${money(x[1]*x[2])}</span></div>`).join("")}
-      <div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;"><span>運費</span><span>${t.ship===0?"免運":money(t.ship)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-weight:800;color:var(--wine);border-top:1px dashed var(--line);margin-top:4px;padding-top:6px;"><span>合計</span><span>${money(t.total)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;"><span>運費</span><span>${o.type==="pickup"?"自取免運":(o.shipFee? money(o.shipFee):"免運")}</span></div>
+      ${o.pointsUsed? `<div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;color:var(--gold);"><span>點數折抵</span><span>- ${money(o.pointsUsed)}</span></div>`:""}
+      <div style="display:flex;justify-content:space-between;font-weight:800;color:var(--wine);border-top:1px dashed var(--line);margin-top:4px;padding-top:6px;"><span>${o.payMethod==="cash"?"取貨應付":"應付金額"}</span><span>${money(o.total)}</span></div>
     </div>
-    <div class="m-sec">滷 汁</div>
-    <div class="m-card" style="font-size:14px;">${o.sauce}</div>`;
+
+    <div class="m-sec">付 款 與 滷 汁</div>
+    <div class="m-card" style="font-size:14px;line-height:2;">
+      付款方式　<b>${payTxt}</b><br>
+      靈魂滷汁　<b>${o.sauce||"—"}</b>
+      ${o.note? `<br>備註　${o.note}`:""}
+    </div>`;
   go("p-odetail");
 }
 function reset(){ cart={}; sauceSel=""; renderMenu(); renderBar(); renderCart(); go("p-menu"); }
 
-(function(){
-  const dt = $("f-pdate");
-  const iso = d => d.toISOString().slice(0,10);
-  const today = new Date();
-  const maxD = new Date(); maxD.setDate(maxD.getDate()+30);
-  dt.min = iso(today);
-  dt.max = iso(maxD); /* 最多預訂 30 天內，待店家確認可再調 */
-  const sel = $("f-ptime");
-  for(let t=360; t<=730; t+=20){
-    const f = x => Math.floor(x/60) + ":" + String(x%60).padStart(2,"0");
-    const o = document.createElement("option");
-    o.textContent = f(t) + "–" + f(t+20);
-    sel.appendChild(o);
+/* ══ 自取日期與時段（依現在時間自動排除已過時段） ══ */
+const SLOT_START = 360, SLOT_END = 750, SLOT_GAP = 20; /* 6:00–12:30，每 20 分鐘 */
+const LEAD_MIN = 120; /* 備貨提前時間（分鐘），之後可移到後台設定 */
+const isoLocal = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+const hhmm = x => Math.floor(x/60) + ":" + String(x%60).padStart(2,"0");
+function slotsLeftToday(){
+  const now = new Date();
+  const cut = now.getHours()*60 + now.getMinutes() + LEAD_MIN;
+  const out = [];
+  for(let t=SLOT_START; t+SLOT_GAP<=SLOT_END; t+=SLOT_GAP){ if(t >= cut) out.push(t); }
+  return out;
+}
+function firstAvailableDate(){
+  const d = new Date();
+  if(!slotsLeftToday().length) d.setDate(d.getDate()+1);
+  return d;
+}
+function renderSlots(){
+  const dt = $("f-pdate"), sel = $("f-ptime");
+  if(!dt || !sel) return;
+  const chosen = sel.value;
+  const isToday = dt.value === isoLocal(new Date());
+  const list = [];
+  for(let t=SLOT_START; t+SLOT_GAP<=SLOT_END; t+=SLOT_GAP) list.push(t);
+  const avail = isToday? slotsLeftToday() : list;
+  sel.innerHTML = '<option value="">請選擇</option>' +
+    avail.map(t=>`<option>${hhmm(t)}–${hhmm(t+SLOT_GAP)}</option>`).join("");
+  if(chosen && avail.some(t=>hhmm(t)+"–"+hhmm(t+SLOT_GAP)===chosen)) sel.value = chosen;
+  const warn = $("slot-warn");
+  if(warn) warn.style.display = (isToday && !avail.length)? "block":"none";
+}
+function renderDates(){
+  const dt = $("f-pdate"); if(!dt) return;
+  const keep = dt.value;
+  const opts = [];
+  const start = new Date();
+  if(!slotsLeftToday().length) start.setDate(start.getDate()+1);
+  for(let i=0;i<14;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const iso = isoLocal(d);
+    const label = `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}（${WD[d.getDay()]}）`
+      + (i===0 && iso===isoLocal(new Date()) ? "　今天" : "");
+    opts.push(`<option value="${iso}">${label}</option>`);
   }
-})();
+  dt.innerHTML = '<option value="">請選擇</option>' + opts.join("");
+  if(keep) dt.value = keep;
+  renderSlots();
+}
+renderDates();
 renderCats(); renderMenu(); renderBar(); renderCart();
 </script>
 <script src="firebase-config.js"></script>
