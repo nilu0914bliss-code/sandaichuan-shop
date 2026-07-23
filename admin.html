@@ -13,6 +13,11 @@
   header{background:var(--wine);color:var(--cream);padding:14px 16px;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;}
   header .t{font-size:16px;font-weight:700;letter-spacing:3px;font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;flex:1;}
   header button{border:1px solid var(--cream);background:none;color:var(--cream);border-radius:3px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  .ch-bar{display:flex;gap:6px;padding:12px 16px 0;}
+  .ch-btn{flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:6px;
+    padding:9px 0;font-size:13px;font-family:inherit;cursor:pointer;letter-spacing:1px;}
+  .ch-btn.on{background:var(--wine);color:var(--cream);font-weight:700;}
+  .ch-note{font-size:11.5px;color:var(--ink-soft);padding:8px 16px 0;line-height:1.7;}
   .shopbar{background:var(--wine-deep);color:var(--cream);padding:9px 16px;display:flex;align-items:center;gap:10px;
     position:sticky;top:52px;z-index:29;}
   .shopbar .sb-lb{font-size:11.5px;opacity:.8;letter-spacing:2px;}
@@ -214,37 +219,33 @@
   </div>
 
   <div class="view" id="v-set">
+    <div class="ch-bar" id="ch-bar-set"></div>
     <div class="m-wrap">
+      <div class="ch-note" id="set-note"></div>
+
       <div class="mi">
-        <div class="mi-h"><span class="nm">開放到店自取</span><span class="sw-lb" id="lb-pickup"></span>
-          <button class="switch" id="sw-pickup"></button></div>
+        <div class="mi-h"><span class="nm" id="lb-open-name">開放接單</span><span class="sw-lb" id="lb-open"></span>
+          <button class="switch" id="sw-open"></button></div>
+        <div class="hint" id="hint-open"></div>
       </div>
-      <div class="mi">
-        <div class="mi-h"><span class="nm">開放冷凍宅配</span><span class="sw-lb" id="lb-delivery"></span>
-          <button class="switch" id="sw-delivery"></button></div>
-        <div class="hint">宅配需要線上付款；「線上付款」未開放時，客人端的宅配會自動顯示「尚未開放」</div>
-      </div>
-      <div class="mi">
-        <div class="mi-h"><span class="nm">開放線上付款（信用卡／LINE Pay）</span><span class="sw-lb" id="lb-onlinePay"></span>
-          <button class="switch" id="sw-onlinePay"></button></div>
-        <div class="hint">金流部署完成前請保持關閉；關閉時客人只能選「現金（取貨時付款）」</div>
-      </div>
+
       <div class="mi">
         <div class="mi-h"><span class="nm">首頁公告</span><span class="sw-lb" id="lb-ann"></span>
           <button class="switch" id="sw-ann"></button></div>
-        <textarea id="ann-input" rows="3" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:4px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;" placeholder="例：本週六僅出攤鳳山工協"></textarea>
+        <textarea id="ann-input" rows="3" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:4px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;" placeholder="例：本週六提早收攤"></textarea>
         <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
           <div class="ph-box" style="width:88px;height:66px;" onclick="pickAnnPhoto()">
             <img id="ann-thumb" style="display:none;" alt="">
             <span id="ann-plus">+<br>公告圖片</span>
           </div>
           <div style="flex:1;">
-            <div class="hint" style="margin:0;">選填。會顯示在客人端首頁公告下方</div>
+            <div class="hint" style="margin:0;">選填。只會顯示給選了這個取貨點的客人</div>
             <button class="btn" id="ann-rm" style="display:none;margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="removeAnnPhoto()">移除圖片</button>
           </div>
         </div>
       </div>
-      <div class="mi">
+
+      <div class="mi" id="off-block">
         <div class="mi-h" style="margin-bottom:8px;"><span class="nm">公休日</span></div>
         <div class="hint" style="margin:0 0 6px;">點一下日期設為公休，再點一下取消。設為公休的日子，客人端無法選為取貨日。</div>
         <div id="cal-wrap"></div>
@@ -257,12 +258,20 @@
           <div class="sum-l" id="off-sum">尚未設定公休日</div>
         </div>
       </div>
+
+      <div class="mi" style="background:var(--cream-soft);">
+        <div class="mi-h"><span class="nm">開放線上付款（信用卡／LINE Pay）</span><span class="sw-lb" id="lb-onlinePay"></span>
+          <button class="switch" id="sw-onlinePay"></button></div>
+        <div class="hint">此項為<b>全站共用</b>設定。金流部署完成前請保持關閉；關閉時客人只能選「現金（取貨時付款）」。</div>
+      </div>
+
       <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;">儲存設定</button>
       <div class="hint" style="margin-top:8px;">儲存後客人端重新整理即生效</div>
     </div>
   </div>
 
   <div class="view" id="v-menu">
+    <div class="ch-bar" id="ch-bar-menu"></div>
     <div class="m-wrap" id="menu-body"><div class="empty">載入中…</div></div>
     <div class="save-bar"><button class="btn btn-full" id="btn-save-menu">儲存菜單變更</button></div>
   </div>
@@ -322,14 +331,24 @@ function setView(v){
 }
 
 /* ── 店家設定 ── */
-let SHOP = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[] };
+/* ══ 設定：全站 + 各通路 ══ */
+let GLOBAL = { onlinePayOpen:false };
+let CHSET = {};   /* { fs:{open,annOn,annText,annImage,offDates}, sm:{...}, dl:{...} } */
+function curSet(){
+  if(!CHSET[EDIT_CH]) CHSET[EDIT_CH] = {open:true, annOn:false, annText:"", annImage:"", offDates:[]};
+  return CHSET[EDIT_CH];
+}
+/* 為了沿用既有函式，SHOP 指向目前通路 */
+Object.defineProperty(window, "SHOP", { get: ()=>curSet() });
+
+/* ── 公休日日曆（分通路） ── */
 const WDN = ["日","一","二","三","四","五","六"];
 const isoOf = (y,m,d)=> y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
 function buildMonth(y, m){
   const first = new Date(y,m,1).getDay();
   const days = new Date(y,m+1,0).getDate();
   const now = new Date(); now.setHours(0,0,0,0);
-  const offs = SHOP.offDates || [];
+  const offs = curSet().offDates || [];
   let cells = WDN.map((w,i)=>`<div class="hd ${i===0||i===6?"wk":""}">${w}</div>`).join("");
   for(let i=0;i<first;i++) cells += `<div class="d empty"></div>`;
   for(let d=1;d<=days;d++){
@@ -349,13 +368,14 @@ function buildMonth(y, m){
 }
 function renderOff(){
   const wrap = $("cal-wrap"); if(!wrap) return;
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  if(cur.type !== "pickup"){ wrap.innerHTML = ""; return; }
   const now = new Date();
-  const y1 = now.getFullYear(), m1 = now.getMonth();
-  const nx = new Date(y1, m1+1, 1);
-  wrap.innerHTML = buildMonth(y1, m1) + buildMonth(nx.getFullYear(), nx.getMonth());
-
+  const nx = new Date(now.getFullYear(), now.getMonth()+1, 1);
+  wrap.innerHTML = buildMonth(now.getFullYear(), now.getMonth())
+                 + buildMonth(nx.getFullYear(), nx.getMonth());
   const todayISO = isoOf(now.getFullYear(), now.getMonth(), now.getDate());
-  const list = (SHOP.offDates||[]).filter(k=>k>=todayISO).sort();
+  const list = (curSet().offDates||[]).filter(k=>k>=todayISO).sort();
   const sum = $("off-sum");
   if(sum) sum.innerHTML = list.length
     ? list.map(k=>{
@@ -364,26 +384,39 @@ function renderOff(){
       }).join("　")
     : "尚未設定公休日";
 }
-/* ── 開關（自取／宅配／線上付款／公告） ── */
-const SW_KEYS = ["pickup","delivery","onlinePay","ann"];
-function swKeyToField(k){ return k==="ann"? "annOn" : k+"Open"; }
+window.toggleOff = key=>{
+  const s = curSet();
+  s.offDates = s.offDates || [];
+  s.offDates = s.offDates.includes(key) ? s.offDates.filter(x=>x!==key) : [...s.offDates, key];
+  renderOff();
+};
+
 function renderSettings(){
-  SW_KEYS.forEach(k=>{
-    const on = !!SHOP[swKeyToField(k)];
-    const sw = $("sw-"+k), lb = $("lb-"+k);
-    if(sw) sw.classList.toggle("on", on);
-    if(lb) lb.textContent = k==="ann" ? (on? "顯示中":"已隱藏") : (on? "開放中":"已關閉");
-  });
-  const ai = $("ann-input");
-  if(ai) ai.value = SHOP.annText || "";
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  const s = curSet();
+  const note = $("set-note");
+  if(note) note.innerHTML = `目前設定：<b style="color:var(--wine);">${cur.n}</b>　公告與公休日只影響這個取貨點。`;
+
+  $("lb-open-name").textContent = cur.type==="pickup" ? `開放「${cur.n}」自取` : "開放冷凍宅配";
+  $("hint-open").textContent = cur.type==="pickup"
+    ? "關閉後，客人端選不到這個取貨點。"
+    : "宅配需要線上付款；線上付款未開放時，客人端的宅配會顯示「尚未開放」。";
+  $("sw-open").classList.toggle("on", s.open !== false);
+  $("lb-open").textContent = (s.open !== false)? "開放中":"已關閉";
+
+  $("sw-ann").classList.toggle("on", !!s.annOn);
+  $("lb-ann").textContent = s.annOn? "顯示中":"已隱藏";
+  $("ann-input").value = s.annText || "";
+
+  $("sw-onlinePay").classList.toggle("on", !!GLOBAL.onlinePayOpen);
+  $("lb-onlinePay").textContent = GLOBAL.onlinePayOpen? "開放中":"已關閉";
+
+  const ob = $("off-block");
+  if(ob) ob.style.display = cur.type==="pickup" ? "block":"none";
 }
-SW_KEYS.forEach(k=>{
-  const sw = $("sw-"+k);
-  if(sw) sw.onclick = ()=>{
-    SHOP[swKeyToField(k)] = !SHOP[swKeyToField(k)];
-    renderSettings();
-  };
-});
+$("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
+$("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
+$("sw-onlinePay").onclick = ()=>{ GLOBAL.onlinePayOpen = !GLOBAL.onlinePayOpen; renderSettings(); };
 
 window.toggleOff = key=>{
   SHOP.offDates = SHOP.offDates || [];
@@ -394,21 +427,37 @@ window.toggleOff = key=>{
 };
 async function loadSettings(){
   try{
-    const s = await getDoc(doc(db,"settings","shop"));
-    if(s.exists()) SHOP = Object.assign(SHOP, s.data());
-  }catch(e){ console.error(e); }
-  renderSettings();
-  renderOff();
-  renderAnnPhoto();
+    const g = await getDoc(doc(db,"settings","global"));
+    if(g.exists()) GLOBAL = Object.assign(GLOBAL, g.data());
+    for(const c of CH){
+      const s = await getDoc(doc(db,"settings","ch_"+c.k));
+      CHSET[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[]},
+                                 s.exists()? s.data() : {});
+    }
+  }catch(e){ console.error("讀取設定失敗", e); }
+  renderChBar("menu"); renderChBar("set");
+  renderSettings(); renderOff(); renderAnnPhoto();
 }
 $("btn-save-set").onclick = async ()=>{
-  SHOP.annText = $("ann-input").value.trim();
-  SHOP.annImage = SHOP.annImage || "";
+  const s = curSet();
+  s.annText = $("ann-input").value.trim();
+  s.annImage = s.annImage || "";
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   try{
-    await setDoc(doc(db,"settings","shop"), SHOP, {merge:true});
-    toast("設定已儲存");
+    await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
+    await setDoc(doc(db,"settings","global"), GLOBAL, {merge:true});
+    toast("已儲存（" + cur.n + "）");
   }catch(e){ console.error(e); toast("儲存失敗"); }
 };
+
+/* ══ 通路（各自獨立的價格、庫存、公告、公休） ══ */
+const CH = [
+  {k:"fs", n:"鳳山工協", type:"pickup"},
+  {k:"sm", n:"三民陽明", type:"pickup"},
+  {k:"dl", n:"冷凍宅配", type:"delivery"}
+];
+const chByName = n => (CH.find(c=>c.n===n) || CH[0]);
+let EDIT_CH = "fs";   /* 目前正在編輯哪個通路 */
 
 /* ── 訂單 ── */
 let ORDERS = [];
@@ -431,12 +480,18 @@ window.pickShop = v=>{
   $("shop-cur").textContent = v;
   $("shop-modal").classList.remove("on");
   knownIds = null;              /* 換門市不要誤判成新單 */
+  const c = CH.find(x=>x.n===v);
+  if(c){ EDIT_CH = c.k; renderChBar("menu"); renderChBar("set"); renderMenu(); renderSettings(); renderOff(); renderAnnPhoto(); }
   renderOrders();
   toast("已設定為「" + v + "」");
 };
 function syncShopBar(){
   $("shopbar").style.display = "flex";
   $("shop-cur").textContent = MY_SHOP || "尚未設定";
+  if(MY_SHOP && MY_SHOP !== "全部門市"){
+    const c = CH.find(x=>x.n===MY_SHOP);
+    if(c) EDIT_CH = c.k;
+  }
   if(!MY_SHOP) openShopPick();
 }
 const ST_LABEL = {
@@ -836,60 +891,91 @@ window.removePhoto = async idx=>{
 };
 window.toggleItem = async idx=>{
   const p = PRODUCTS[idx];
-  try{ await updateDoc(doc(db,"products",p.docId), {on: !(p.on!==false)}); toast(p.on!==false? p.n+" 已設為售完":p.n+" 已上架"); }
-  catch(e){ console.error(e); toast("儲存失敗"); }
+  const cur = chData(p).on;
+  try{
+    await updateDoc(doc(db,"products",p.docId), {["ch."+EDIT_CH+".on"]: !cur});
+    toast(p.n + (cur? " 已設為售完":" 已上架"));
+  }catch(e){ console.error(e); toast("儲存失敗"); }
 };
 window.markDirty = idx => dirty.add(idx);
+/* ── 通路切換列 ── */
+function renderChBar(which){
+  const el = $("ch-bar-" + which); if(!el) return;
+  el.innerHTML = CH.map(c=>
+    `<button class="ch-btn ${EDIT_CH===c.k?"on":""}" onclick="setEditCh('${c.k}')">${c.n}</button>`).join("");
+}
+window.setEditCh = k=>{
+  EDIT_CH = k;
+  dirty.clear();
+  renderChBar("menu"); renderChBar("set");
+  renderMenu(); renderSettings(); renderOff(); renderAnnPhoto();
+};
+/* 取得某商品在目前通路的設定 */
+function chData(p){
+  const c = (p.ch && p.ch[EDIT_CH]) || {};
+  return {
+    on: c.on !== false,
+    limit: (c.limit === undefined || c.limit === null) ? "" : c.limit,
+    prices: (p.vars||[]).map((v,vi)=> (c.prices && c.prices[vi] !== undefined && c.prices[vi] !== null) ? c.prices[vi] : v.p)
+  };
+}
+
 function renderMenu(){
-  let html = `<div class="hint" style="margin-top:2px;">價格與自取限量改完按底部「儲存菜單變更」；售完開關點了立即生效。自取限量：同一取貨日的自取訂單加總不得超過限量；宅配不限量。</div>`;
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  let html = `<div class="ch-note">目前編輯：<b style="color:var(--wine);">${cur.n}</b>　價格、售完、限量都只影響這個通路。<br>照片與品項名稱三個通路共用。</div>`;
   let lastCat = null;
   PRODUCTS.forEach((p,idx)=>{
+    const d = chData(p);
     if(p.cat!==lastCat){ html += `<div class="cat-title">${p.cat}</div>`; lastCat = p.cat; }
-    const on = p.on!==false;
-    html += `<div class="mi ${on?"":"off"}">
+    html += `<div class="mi ${d.on?"":"off"}">
       <div class="mi-h">
         <span class="nm">${p.n}</span>
-        <span class="sw-lb">${on?"販售中":"售完/下架"}</span>
-        <button class="switch ${on?"on":""}" onclick="toggleItem(${idx})"></button>
+        <span class="sw-lb">${d.on?"販售中":"售完/下架"}</span>
+        <button class="switch ${d.on?"on":""}" onclick="toggleItem(${idx})"></button>
       </div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
         <div class="ph-box" onclick="pickPhoto(${idx})">
           ${p.photo? `<img src="${p.photo}" alt="">` : `<span>+<br>照片</span>`}
         </div>
         <div style="flex:1;">
-          <div class="hint" style="margin:0;">點左側方框上傳商品照片<br>建議正方形、主體置中</div>
+          <div class="hint" style="margin:0;">點左側方框上傳商品照片（三通路共用）<br>建議正方形、主體置中</div>
           ${p.photo? `<button class="btn" style="margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="event.stopPropagation();removePhoto(${idx})">移除照片</button>`:""}
         </div>
       </div>
+      ${cur.type==="pickup" ? `
       <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">
-        <span class="vl" style="font-weight:700;color:var(--ink);">自取每日限量</span>
-        <input type="number" min="0" placeholder="不限" value="${p.limit??""}" id="lim-${idx}" oninput="markDirty(${idx})">
+        <span class="vl" style="font-weight:700;color:var(--ink);">每日限量</span>
+        <input type="number" min="0" placeholder="不限" value="${d.limit}" id="lim-${idx}" oninput="markDirty(${idx})">
         <span class="u">份</span>
-      </div>
+      </div>` : ""}
       ${(p.vars||[]).map((v,vi)=>`
         <div class="vr">
           <span class="vl">${v.v||"單份"}</span>
-          <input type="number" min="0" value="${v.p}" id="pr-${idx}-${vi}" oninput="markDirty(${idx})">
+          <input type="number" min="0" value="${d.prices[vi]}" id="pr-${idx}-${vi}" oninput="markDirty(${idx})">
           <span class="u">元</span>
         </div>`).join("")}
     </div>`;
   });
   $("menu-body").innerHTML = html;
 }
+
 $("btn-save-menu").onclick = async ()=>{
   if(!dirty.size){ toast("沒有變更"); return; }
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   let ok = 0;
   for(const idx of dirty){
     const p = PRODUCTS[idx];
-    const limRaw = $("lim-"+idx).value;
-    const newVars = (p.vars||[]).map((v,vi)=>({v:v.v, p:+($("pr-"+idx+"-"+vi).value||0)}));
-    try{
-      await updateDoc(doc(db,"products",p.docId), {vars:newVars, limit: limRaw===""? null:+limRaw});
-      ok++;
-    }catch(e){ console.error(e); }
+    const limEl = $("lim-"+idx);
+    const limRaw = limEl ? limEl.value : "";
+    const prices = (p.vars||[]).map((v,vi)=> +($("pr-"+idx+"-"+vi).value || 0));
+    const payload = {};
+    payload["ch."+EDIT_CH+".prices"] = prices;
+    if(cur.type==="pickup") payload["ch."+EDIT_CH+".limit"] = (limRaw===""? null : +limRaw);
+    try{ await updateDoc(doc(db,"products",p.docId), payload); ok++; }
+    catch(e){ console.error(e); }
   }
   dirty.clear();
-  toast(`已儲存 ${ok} 個品項`);
+  toast(`已儲存 ${ok} 個品項（${cur.n}）`);
 };
 </script>
 </body>
