@@ -13,7 +13,25 @@
   header{background:var(--wine);color:var(--cream);padding:14px 16px;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;}
   header .t{font-size:16px;font-weight:700;letter-spacing:3px;font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;flex:1;}
   header button{border:1px solid var(--cream);background:none;color:var(--cream);border-radius:3px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
-  .mtabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:52px;z-index:29;}
+  .shopbar{background:var(--wine-deep);color:var(--cream);padding:9px 16px;display:flex;align-items:center;gap:10px;
+    position:sticky;top:52px;z-index:29;}
+  .shopbar .sb-lb{font-size:11.5px;opacity:.8;letter-spacing:2px;}
+  .shopbar .sb-cur{flex:1;font-size:14px;font-weight:700;letter-spacing:2px;}
+  .shopbar button{border:1px solid rgba(233,214,169,.5);background:none;color:var(--cream);
+    border-radius:3px;font-size:11.5px;padding:4px 12px;cursor:pointer;font-family:inherit;}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:24px;z-index:80;}
+  .modal.on{display:flex;}
+  .mbox{background:var(--paper);border-radius:12px;width:100%;max-width:320px;padding:20px;}
+  .mbox h3{font-size:16px;letter-spacing:3px;text-align:center;margin-bottom:6px;
+    font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;}
+  .mbox p{font-size:12px;color:var(--ink-soft);text-align:center;line-height:1.8;margin-bottom:16px;}
+  .opt{width:100%;padding:14px;border:1.5px solid var(--line);background:#fff;border-radius:8px;
+    font-family:inherit;font-size:15px;cursor:pointer;margin-bottom:9px;color:var(--ink);text-align:left;
+    display:flex;align-items:center;gap:10px;}
+  .opt.on{border-color:var(--wine);background:#F7E9E3;font-weight:700;color:var(--wine);}
+  .opt i{font-style:normal;font-size:17px;}
+  .opt small{display:block;font-size:11px;color:var(--ink-soft);font-weight:400;margin-top:2px;}
+  .mtabs{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:94px;z-index:28;}
   .mtab{flex:1;border:none;background:none;padding:12px 0;font-size:14.5px;letter-spacing:3px;color:var(--ink-soft);cursor:pointer;font-family:inherit;border-bottom:2.5px solid transparent;}
   .mtab.on{color:var(--wine);font-weight:800;border-bottom-color:var(--wine);}
   .view{display:none;} .view.show{display:block;}
@@ -142,7 +160,23 @@
 
 <!-- 主畫面 -->
 <div id="main" style="display:none;">
-  <div class="mtabs">
+  <div class="shopbar" id="shopbar" style="display:none;">
+  <span class="sb-lb">本機門市</span>
+  <span class="sb-cur" id="shop-cur">—</span>
+  <button onclick="openShopPick()">切換</button>
+</div>
+
+<div class="modal" id="shop-modal">
+  <div class="mbox">
+    <h3>本 機 門 市</h3>
+    <p>這台裝置放在哪個攤位？<br>選好之後只會收到該攤位的訂單與提示音。</p>
+    <button class="opt" data-s="鳳山工協" onclick="pickShop('鳳山工協')"><i>🏪</i><span>鳳山工協<small>只收這個市場的自取單</small></span></button>
+    <button class="opt" data-s="三民陽明" onclick="pickShop('三民陽明')"><i>🏪</i><span>三民陽明<small>只收這個市場的自取單</small></span></button>
+    <button class="opt" data-s="全部門市" onclick="pickShop('全部門市')"><i>👀</i><span>全部門市<small>所有訂單與宅配單（老闆用）</small></span></button>
+  </div>
+</div>
+
+<div class="mtabs">
     <button class="mtab on" id="mt-orders">訂單</button>
     <button class="mtab" id="mt-menu">菜單</button>
     <button class="mtab" id="mt-set">設定</button>
@@ -263,7 +297,8 @@ onAuthStateChanged(auth, user=>{
   $("main").style.display = user? "block":"none";
   $("btn-logout").style.display = user? "inline-block":"none";
   $("btn-refresh").style.display = user? "inline-block":"none";
-  if(user) startData();
+  if(user){ syncShopBar(); startData(); }
+  else { $("shopbar").style.display = "none"; }
 });
 $("login-form").addEventListener("submit", async e=>{
   e.preventDefault();
@@ -329,6 +364,27 @@ function renderOff(){
       }).join("　")
     : "尚未設定公休日";
 }
+/* ── 開關（自取／宅配／線上付款／公告） ── */
+const SW_KEYS = ["pickup","delivery","onlinePay","ann"];
+function swKeyToField(k){ return k==="ann"? "annOn" : k+"Open"; }
+function renderSettings(){
+  SW_KEYS.forEach(k=>{
+    const on = !!SHOP[swKeyToField(k)];
+    const sw = $("sw-"+k), lb = $("lb-"+k);
+    if(sw) sw.classList.toggle("on", on);
+    if(lb) lb.textContent = k==="ann" ? (on? "顯示中":"已隱藏") : (on? "開放中":"已關閉");
+  });
+  const ai = $("ann-input");
+  if(ai) ai.value = SHOP.annText || "";
+}
+SW_KEYS.forEach(k=>{
+  const sw = $("sw-"+k);
+  if(sw) sw.onclick = ()=>{
+    SHOP[swKeyToField(k)] = !SHOP[swKeyToField(k)];
+    renderSettings();
+  };
+});
+
 window.toggleOff = key=>{
   SHOP.offDates = SHOP.offDates || [];
   SHOP.offDates = SHOP.offDates.includes(key)
@@ -357,6 +413,32 @@ $("btn-save-set").onclick = async ()=>{
 /* ── 訂單 ── */
 let ORDERS = [];
 let stF = "today", tyF = "all";
+/* ══ 本機門市（存在這台裝置） ══ */
+let MY_SHOP = "";
+try{ MY_SHOP = localStorage.getItem("sdc_shop") || ""; }catch(e){}
+function inMyShop(o){
+  if(MY_SHOP === "全部門市" || !MY_SHOP) return true;
+  if(o.type === "pickup") return o.pickup && o.pickup.market === MY_SHOP;
+  return false; /* 宅配單只在「全部門市」顯示 */
+}
+window.openShopPick = ()=>{
+  document.querySelectorAll("#shop-modal .opt").forEach(b=>b.classList.toggle("on", b.dataset.s===MY_SHOP));
+  $("shop-modal").classList.add("on");
+};
+window.pickShop = v=>{
+  MY_SHOP = v;
+  try{ localStorage.setItem("sdc_shop", v); }catch(e){}
+  $("shop-cur").textContent = v;
+  $("shop-modal").classList.remove("on");
+  knownIds = null;              /* 換門市不要誤判成新單 */
+  renderOrders();
+  toast("已設定為「" + v + "」");
+};
+function syncShopBar(){
+  $("shopbar").style.display = "flex";
+  $("shop-cur").textContent = MY_SHOP || "尚未設定";
+  if(!MY_SHOP) openShopPick();
+}
 const ST_LABEL = {
   pending_payment: ["待付款","wait"],
   confirmed_cash: ["現金待收","cash"],
@@ -427,7 +509,7 @@ function onOrders(list){
   ORDERS = list;
   const ids = new Set(ORDERS.map(o=>o.docId));
   if(knownIds){
-    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId));
+    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId) && inMyShop(o));
     if(fresh.length){
       beep();
       const n = fresh[0];
@@ -519,7 +601,7 @@ window.printOrder = id=>{
 };
 window.printToday = ()=>{
   const t = todayStr();
-  const list = ORDERS.filter(o=>o.type==="pickup" && !isCancelled(o) && !isDone(o) && o.pickup && o.pickup.date===t)
+  const list = ORDERS.filter(o=>o.type==="pickup" && inMyShop(o) && !isCancelled(o) && !isDone(o) && o.pickup && o.pickup.date===t)
     .sort((a,b)=> String(a.pickup.slot||"").localeCompare(String(b.pickup.slot||"")));
   if(!list.length){ toast("今天沒有待處理的自取單"); return; }
   list.forEach((o,i)=> setTimeout(()=> sendToPrinter(buildTicket(o)), i*1500));
@@ -579,12 +661,13 @@ window.pickupDone = async id=>{
 };
 function renderOrders(){
   const tISO0 = todayStr();
-  $("st-todo").textContent = ORDERS.filter(o=>!isDone(o)&&!isCancelled(o)&&(o.type!=="pickup"||(o.pickup&&o.pickup.date<=tISO0))).length;
-  $("st-wait").textContent = ORDERS.filter(o=>!isDone(o)&&!isCancelled(o)&&o.type==="pickup"&&o.pickup&&o.pickup.date>tISO0).length;
+  const MINE = ORDERS.filter(inMyShop);
+  $("st-todo").textContent = MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&(o.type!=="pickup"||(o.pickup&&o.pickup.date<=tISO0))).length;
+  $("st-wait").textContent = MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&o.type==="pickup"&&o.pickup&&o.pickup.date>tISO0).length;
   const tISO = todayStr();
-  $("st-today").textContent = ORDERS.filter(o=>o.createdAt && o.createdAt.toDate && o.createdAt.toDate().toISOString().slice(0,10)===tISO).length;
+  $("st-today").textContent = MINE.filter(o=>o.createdAt && o.createdAt.toDate && o.createdAt.toDate().toISOString().slice(0,10)===tISO).length;
 
-  const show = ORDERS.map(o=>({o})).filter(({o})=>{
+  const show = MINE.map(o=>({o})).filter(({o})=>{
     const t = todayStr();
     const active = !isDone(o) && !isCancelled(o);
     const isTodayOrder = active && (
