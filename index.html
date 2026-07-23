@@ -594,6 +594,7 @@ async function pay(){
     return {name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:va.p};
   });
   const order = {
+    uid: (member && member.uid) || null,
     orderNo:no, type:shipMethod, payMethod:payway,
     status: payway==="cash" ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
@@ -603,12 +604,12 @@ async function pay(){
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
   else { order.pickup = {market:$("f-pmarket").value, date:$("f-pdate").value, slot:$("f-ptime").value}; }
 
-  let saveNote = "";
+  let saveNote = "", savedDocId = null;
   if(window.fbSaveOrder){
     const btn=$("pay-btn");
     try{
       btn.disabled=true; btn.textContent="訂單送出中…";
-      await window.fbSaveOrder(order);
+      savedDocId = await window.fbSaveOrder(order);
     }catch(e){
       console.error(e);
       alert("訂單送出失敗，請再試一次。");
@@ -623,6 +624,27 @@ async function pay(){
   if(member){
     MY_ORDERS.unshift({no, time:"剛剛", status:0, track:"", sauce:sauceSel,
       items: items.map(x=>[x.name, x.qty, x.price])});
+  }
+  if(payway !== "cash" && savedDocId && SETTINGS.onlinePayOpen){
+    try{
+      const r = await fetch(FN + "/createPayment", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({docId: savedDocId})
+      });
+      const p = await r.json();
+      if(p.gateway && p.TradeInfo){
+        const f = document.createElement("form");
+        f.method = "POST"; f.action = p.gateway;
+        [["MerchantID",p.MerchantID],["TradeInfo",p.TradeInfo],["TradeSha",p.TradeSha],["Version",p.Version]]
+          .forEach(([k,v])=>{ const i=document.createElement("input"); i.type="hidden"; i.name=k; i.value=v; f.appendChild(i); });
+        document.body.appendChild(f); f.submit();
+        return;
+      }
+      alert("建立付款失敗，訂單已保留為待付款，可稍後於會員中心重試。");
+    }catch(e){
+      console.error(e);
+      alert("連線付款頁失敗，訂單已保留為待付款。");
+    }
   }
   $("order-no").textContent = no;
   $("done-paid").textContent = payway==="cash"? "訂單成立・取貨時現金付款":"訂單已成立・待付款";
@@ -648,11 +670,63 @@ const FAKE_ORDERS = [
 const ST = [["s0","已付款"],["s1","備貨中"],["s2","已出貨"]];
 
 function memberEntry(){ member? (go("p-member"), renderMember()) : go("p-login"); }
-function lineAuth(){ $("line-first").style.display = "block"; }
+const FN = "https://asia-east1-sandaichuan-tw.cloudfunctions.net";
+const LINE_CHANNEL_ID = "2010810194";
+const REDIRECT_URI = location.origin + location.pathname;
+function lineAuth(){
+  if(!window.fbAuth){ $("line-first").style.display = "block"; return; }
+  const state = Math.random().toString(36).slice(2);
+  try{ sessionStorage.setItem("line_state", state); }catch(e){}
+  const u = "https://access.line.me/oauth2/v2.1/authorize?response_type=code"
+    + "&client_id=" + LINE_CHANNEL_ID
+    + "&redirect_uri=" + encodeURIComponent(REDIRECT_URI)
+    + "&state=" + state
+    + "&scope=profile%20openid";
+  location.href = u;
+}
 function isBirthMonth(){
   return !!(member && member.birth && (+member.birth.split("-")[1] === new Date().getMonth()+1));
 }
-function login(){
+window.onMemberLogin = async (uid, m)=>{
+  member = {
+    uid, name: m.displayName || "會員",
+    phone: m.phone || "", birth: m.birth || "",
+    pic: m.pictureUrl || "", count: 0
+  };
+  if(!member.phone || !member.birth){
+    $("line-first").style.display = "block";
+    if(m.phone) $("lp-phone").value = m.phone;
+    if(m.birth) $("f-birth").value = m.birth;
+    go("p-login");
+    return;
+  }
+  await refreshMyOrders();
+  go("p-member"); renderMember();
+};
+window.onMemberLogout = ()=>{ member = null; MY_ORDERS = []; };
+async function refreshMyOrders(){
+  if(!member || !window.fbLoadOrders) return;
+  const list = await window.fbLoadOrders(member.uid);
+  member.count = list.length;
+  MY_ORDERS = list.map(o=>({
+    no: o.orderNo || "",
+    time: o.createdAt && o.createdAt.toDate ? (o.createdAt.toDate().getMonth()+1)+"/"+o.createdAt.toDate().getDate() : "",
+    status: o.status==="shipped"||o.status==="picked_up" ? 2 : (o.status==="paid"||o.status==="confirmed_cash" ? 1 : 0),
+    track: o.track || "", sauce: o.sauce || "",
+    items: (o.items||[]).map(x=>[x.name, x.qty, x.price])
+  }));
+}
+async function login(){
+  if(member && member.uid && window.fbSaveMember){
+    const pv = $("lp-phone").value.trim(), bv = $("f-birth").value;
+    if(!pv){ alert("請填寫手機號碼"); return; }
+    member.phone = pv; if(bv) member.birth = bv;
+    await window.fbSaveMember(member.uid, {phone:pv, birth:bv||""});
+    $("line-first").style.display = "none";
+    await refreshMyOrders();
+    go("p-member"); renderMember();
+    return;
+  }
   member = Object.assign({}, FAKE_MEMBER);
   const bv = $("f-birth").value;
   if(bv) member.birth = bv;
@@ -775,10 +849,15 @@ const badge = document.getElementById("mode-badge");
 if(cfg.apiKey && cfg.projectId){
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc } =
+    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc, where, updateDoc, setDoc } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
     const app = initializeApp(cfg);
     const db = getFirestore(app);
+    const auth = getAuth(app);
+    window.fbAuth = auth;
+    window.fbSignOut = ()=> signOut(auth);
     window.fbSaveOrder = async (o)=>{
       o.createdAt = serverTimestamp();
       const ref = await addDoc(collection(db,"orders"), o);
@@ -800,6 +879,52 @@ if(cfg.apiKey && cfg.projectId){
       const s = await getDoc(doc(db, "settings", "shop"));
       if(s.exists()) applyShopSettings(s.data());
     }catch(e){ console.error("讀取店家設定失敗", e); }
+    // ── LINE 回呼處理 ──
+    const qs = new URLSearchParams(location.search);
+    const lineCode = qs.get("code");
+    if(lineCode){
+      try{
+        const r = await fetch("https://asia-east1-sandaichuan-tw.cloudfunctions.net/lineLogin", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ code: lineCode, redirectUri: location.origin + location.pathname })
+        });
+        const d = await r.json();
+        if(d.token){ await signInWithCustomToken(auth, d.token); }
+        else { console.error("LINE 登入失敗", d); alert("LINE 登入失敗，請再試一次。"); }
+      }catch(e){ console.error(e); alert("LINE 登入發生錯誤。"); }
+      history.replaceState({}, "", location.pathname);
+    }
+
+    // ── 付款返回提示 ──
+    const paidNo = qs.get("paid");
+    if(paidNo){
+      history.replaceState({}, "", location.pathname);
+      setTimeout(()=>alert("付款流程已完成，訂單編號 " + paidNo + "。\n可至會員中心查看訂單狀態。"), 300);
+    }
+
+    // ── 會員狀態 ──
+    window.fbLoadOrders = async (uid)=>{
+      try{
+        const snap = await getDocs(query(collection(db,"orders"), where("uid","==",uid), orderBy("createdAt","desc")));
+        return snap.docs.map(x=>({docId:x.id, ...x.data()}));
+      }catch(e){ console.error("讀取訂單失敗", e); return []; }
+    };
+    window.fbSaveMember = async (uid, data)=>{
+      try{ await setDoc(doc(db,"members",uid), data, {merge:true}); }catch(e){ console.error(e); }
+    };
+    onAuthStateChanged(auth, async user=>{
+      if(user){
+        let m = {};
+        try{
+          const s = await getDoc(doc(db,"members",user.uid));
+          if(s.exists()) m = s.data();
+        }catch(e){ console.error(e); }
+        window.onMemberLogin && window.onMemberLogin(user.uid, m);
+      } else {
+        window.onMemberLogout && window.onMemberLogout();
+      }
+    });
+
     badge.textContent = "已連線資料庫";
   }catch(e){
     console.error("Firebase 初始化失敗：", e);
