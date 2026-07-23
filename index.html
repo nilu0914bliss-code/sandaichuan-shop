@@ -307,6 +307,7 @@
       </div>
       <div class="field"><label>取貨日期 *</label>
         <select id="f-pdate" onchange="renderSlots()"><option value="">請選擇</option></select>
+        <div id="closed-note" style="display:none;margin-top:8px;background:#F7E9E3;border-radius:8px;padding:10px 12px;font-size:12px;color:#A8442F;line-height:1.8;"></div>
       </div>
       <div class="field"><label>取貨時段 *</label>
         <select id="f-ptime"><option value="">請選擇</option></select>
@@ -563,12 +564,9 @@ function nav(t){
   else if(t==="member"){ memberEntry(); }
 }
 /* 店家設定：從資料庫 settings/shop 載入；載入前用保守預設（僅自取＋現金） */
-let SETTINGS = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", weeklyOff:[], offDates:[] };
+let SETTINGS = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[] };
 function isClosed(d){
-  const iso = isoLocal(d);
-  if((SETTINGS.offDates||[]).includes(iso)) return true;
-  if((SETTINGS.weeklyOff||[]).includes(d.getDay())) return true;
-  return false;
+  return (SETTINGS.offDates||[]).includes(isoLocal(d));
 }
 const deliveryAvailable = () => SETTINGS.deliveryOpen && SETTINGS.onlinePayOpen;
 function applyShopSettings(d){
@@ -1114,16 +1112,31 @@ function renderDates(){
   const start = new Date();
   if(!slotsLeftToday().length) start.setDate(start.getDate()+1);
   const todayISO = isoLocal(new Date());
-  for(let i=0;i<30 && opts.length<14;i++){
+  for(let i=0;i<14;i++){
     const d = new Date(start); d.setDate(start.getDate()+i);
-    if(isClosed(d)) continue;
     const iso = isoLocal(d);
-    const label = `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}（${WD[d.getDay()]}）`
-      + (iso===todayISO ? "　今天" : "");
-    opts.push(`<option value="${iso}">${label}</option>`);
+    const label = `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}（${WD[d.getDay()]}）`;
+    if(isClosed(d)){
+      opts.push(`<option value="${iso}" disabled>${label}　公休</option>`);
+    } else {
+      opts.push(`<option value="${iso}">${label}${iso===todayISO ? "　今天":""}</option>`);
+    }
   }
   dt.innerHTML = '<option value="">請選擇</option>' + opts.join("");
-  if(keep && opts.some(o=>o.includes('value="'+keep+'"'))) dt.value = keep;
+  if(keep && !isClosed(new Date(keep.replace(/-/g,"/")))) dt.value = keep;
+
+  /* 近期公休提示 */
+  const note = $("closed-note");
+  if(note){
+    const upcoming = (SETTINGS.offDates||[]).filter(k=>k>=todayISO).sort().slice(0,6);
+    if(upcoming.length){
+      note.innerHTML = "近期公休：" + upcoming.map(k=>{
+        const [y,m,dd] = k.split("-").map(Number);
+        return `<b>${m}/${dd}（${WD[new Date(y,m-1,dd).getDay()]}）</b>`;
+      }).join("　");
+      note.style.display = "block";
+    } else { note.style.display = "none"; }
+  }
   renderSlots();
 }
 renderDates();

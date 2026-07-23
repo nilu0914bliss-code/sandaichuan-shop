@@ -87,6 +87,30 @@
   .vr input{width:82px;padding:7px 9px;border:1px solid var(--line);border-radius:4px;font-size:14px;font-family:inherit;text-align:right;background:#fff;}
   .vr input:focus{outline:none;border-color:var(--wine);}
   .vr .u{font-size:12px;color:var(--ink-soft);}
+  .mon{margin-top:16px;}
+  .mon-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;}
+  .mon-h .m{font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;font-size:17px;font-weight:700;letter-spacing:2px;}
+  .mon-h .y{font-size:11.5px;color:var(--ink-soft);}
+  .mon-h .n{margin-left:auto;font-size:11.5px;color:var(--wine);font-weight:700;}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal .hd{text-align:center;font-size:11px;color:var(--ink-soft);padding:4px 0 6px;letter-spacing:1px;}
+  .cal .hd.wk{color:#B0806A;}
+  .d{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;
+    font-size:14px;cursor:pointer;border:1px solid transparent;background:#fff;transition:.12s;
+    font-family:inherit;color:var(--ink);padding:0;}
+  .d.empty{background:none;cursor:default;}
+  .d.past{color:#CFC5B8;cursor:not-allowed;background:none;}
+  .d.today{border:1px solid var(--wine);font-weight:700;}
+  .d.off{background:var(--wine);color:var(--cream);font-weight:700;border-color:var(--wine);}
+  .legend{display:flex;gap:16px;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  .lg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);}
+  .lg i{width:16px;height:16px;border-radius:50%;display:block;}
+  .lg i.a{background:var(--wine);}
+  .lg i.b{background:#fff;border:1px solid var(--wine);}
+  .sum-box{background:var(--cream-soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:12px;}
+  .sum-t{font-size:12px;color:var(--ink-soft);letter-spacing:1px;}
+  .sum-l{font-size:13.5px;line-height:2;margin-top:4px;}
+  .sum-l b{color:var(--wine);}
   .ph-box{width:74px;height:74px;border:1.5px dashed var(--line);border-radius:6px;background:var(--paper);
     display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;
     font-size:11px;color:var(--ink-soft);text-align:center;line-height:1.5;}
@@ -187,16 +211,17 @@
         </div>
       </div>
       <div class="mi">
-        <div class="mi-h" style="margin-bottom:8px;"><span class="nm">公休日設定</span></div>
-        <div class="hint" style="margin:0 0 6px;">每週固定公休（點選切換，亮起＝公休）</div>
-        <div id="wk-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
-        <div class="hint" style="margin:0 0 6px;">指定日期公休（過年、臨時休息）</div>
-        <div id="off-list" style="margin-bottom:8px;"></div>
-        <div style="display:flex;gap:8px;">
-          <input type="date" id="off-add" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:4px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink);">
-          <button class="btn btn-w" onclick="addOff()">新增</button>
+        <div class="mi-h" style="margin-bottom:8px;"><span class="nm">公休日</span></div>
+        <div class="hint" style="margin:0 0 6px;">點一下日期設為公休，再點一下取消。設為公休的日子，客人端無法選為取貨日。</div>
+        <div id="cal-wrap"></div>
+        <div class="legend">
+          <span class="lg"><i class="a"></i>公休</span>
+          <span class="lg"><i class="b"></i>今天</span>
         </div>
-        <div class="hint" style="margin-top:8px;">公休日客人端無法選為自取日期</div>
+        <div class="sum-box">
+          <div class="sum-t">目 前 設 定</div>
+          <div class="sum-l" id="off-sum">尚未設定公休日</div>
+        </div>
       </div>
       <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;">儲存設定</button>
       <div class="hint" style="margin-top:8px;">儲存後客人端重新整理即生效</div>
@@ -262,52 +287,55 @@ function setView(v){
 }
 
 /* ── 店家設定 ── */
-let SHOP = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", weeklyOff:[], offDates:[] };
+let SHOP = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[] };
 const WDN = ["日","一","二","三","四","五","六"];
+const isoOf = (y,m,d)=> y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+function buildMonth(y, m){
+  const first = new Date(y,m,1).getDay();
+  const days = new Date(y,m+1,0).getDate();
+  const now = new Date(); now.setHours(0,0,0,0);
+  const offs = SHOP.offDates || [];
+  let cells = WDN.map((w,i)=>`<div class="hd ${i===0||i===6?"wk":""}">${w}</div>`).join("");
+  for(let i=0;i<first;i++) cells += `<div class="d empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const key = isoOf(y,m,d);
+    const dt = new Date(y,m,d);
+    const past = dt < now;
+    const isToday = dt.getTime() === now.getTime();
+    cells += `<button class="d ${past?"past":""} ${isToday?"today":""} ${offs.includes(key)?"off":""}"
+      ${past?"disabled":`onclick="toggleOff('${key}')"`}>${d}</button>`;
+  }
+  const cnt = offs.filter(k=>k.startsWith(y+"-"+String(m+1).padStart(2,"0"))).length;
+  return `<div class="mon">
+    <div class="mon-h"><span class="m">${m+1} 月</span><span class="y">${y}</span>
+      <span class="n">${cnt? cnt+" 天公休":""}</span></div>
+    <div class="cal">${cells}</div>
+  </div>`;
+}
 function renderOff(){
-  const wk = $("wk-row");
-  if(wk) wk.innerHTML = WDN.map((d,i)=>
-    `<button class="tab ${(SHOP.weeklyOff||[]).includes(i)?"on":""}" style="flex:none;width:44px;padding:8px 0;" onclick="toggleWd(${i})">${d}</button>`).join("");
-  const ol = $("off-list");
-  const list = (SHOP.offDates||[]).slice().sort();
-  if(ol) ol.innerHTML = list.length
-    ? list.map(d=>`<div style="display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:7px 10px;margin-bottom:6px;font-size:13.5px;">
-        <span style="flex:1;">${d.replace(/-/g,"/")}</span>
-        <button style="border:none;background:none;color:var(--wine);font-weight:800;cursor:pointer;font-family:inherit;font-size:15px;" onclick="rmOff('${d}')">✕</button>
-      </div>`).join("")
-    : `<div class="hint" style="margin:0;">尚無指定公休日</div>`;
+  const wrap = $("cal-wrap"); if(!wrap) return;
+  const now = new Date();
+  const y1 = now.getFullYear(), m1 = now.getMonth();
+  const nx = new Date(y1, m1+1, 1);
+  wrap.innerHTML = buildMonth(y1, m1) + buildMonth(nx.getFullYear(), nx.getMonth());
+
+  const todayISO = isoOf(now.getFullYear(), now.getMonth(), now.getDate());
+  const list = (SHOP.offDates||[]).filter(k=>k>=todayISO).sort();
+  const sum = $("off-sum");
+  if(sum) sum.innerHTML = list.length
+    ? list.map(k=>{
+        const [y,m,d] = k.split("-").map(Number);
+        return `<b>${m}/${d}</b>（${WDN[new Date(y,m-1,d).getDay()]}）`;
+      }).join("　")
+    : "尚未設定公休日";
 }
-window.toggleWd = i=>{
-  SHOP.weeklyOff = SHOP.weeklyOff || [];
-  SHOP.weeklyOff = SHOP.weeklyOff.includes(i)? SHOP.weeklyOff.filter(x=>x!==i) : [...SHOP.weeklyOff, i];
-  renderOff();
-};
-window.addOff = ()=>{
-  const v = $("off-add").value;
-  if(!v) return;
+window.toggleOff = key=>{
   SHOP.offDates = SHOP.offDates || [];
-  if(!SHOP.offDates.includes(v)) SHOP.offDates.push(v);
-  $("off-add").value = "";
+  SHOP.offDates = SHOP.offDates.includes(key)
+    ? SHOP.offDates.filter(x=>x!==key)
+    : [...SHOP.offDates, key];
   renderOff();
 };
-window.rmOff = d=>{
-  SHOP.offDates = (SHOP.offDates||[]).filter(x=>x!==d);
-  renderOff();
-};
-const SW_KEYS = ["pickup","delivery","onlinePay","ann"];
-function swKeyToField(k){ return k==="ann"? "annOn" : k+"Open"; }
-function renderSettings(){
-  SW_KEYS.forEach(k=>{
-    const on = !!SHOP[swKeyToField(k)];
-    $("sw-"+k).classList.toggle("on", on);
-    $("lb-"+k).textContent = on? "開放中":"已關閉";
-  });
-  $("lb-ann").textContent = SHOP.annOn? "顯示中":"已隱藏";
-  $("ann-input").value = SHOP.annText || "";
-}
-SW_KEYS.forEach(k=>{
-  $("sw-"+k).onclick = ()=>{ SHOP[swKeyToField(k)] = !SHOP[swKeyToField(k)]; renderSettings(); };
-});
 async function loadSettings(){
   try{
     const s = await getDoc(doc(db,"settings","shop"));
