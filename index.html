@@ -226,6 +226,13 @@
 </head>
 <body>
 <div class="mock-badge" id="mode-badge">載入中…</div>
+<div id="loading-mask" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(251,246,234,.96);
+  flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="width:38px;height:38px;border:3px solid #E3D5B8;border-top-color:#6F2222;border-radius:50%;animation:spin .8s linear infinite;"></div>
+  <div id="loading-text" style="font-size:14px;color:#6F2222;letter-spacing:2px;font-weight:700;">登入中，請稍候…</div>
+  <div style="font-size:12px;color:#7A6353;">首次登入需要幾秒鐘</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- ══════ 頁1：商品頁 ══════ -->
 <div class="page show" id="p-menu">
@@ -838,6 +845,7 @@ function isBirthMonth(){
 }
 window.onMemberLogin = async (uid, m)=>{
   authReady = true;
+  const mask = document.getElementById("loading-mask");
   try{ localStorage.setItem("sdc_logged","1"); }catch(e){}
   hideAuthLoading();
   member = {
@@ -852,6 +860,7 @@ window.onMemberLogin = async (uid, m)=>{
   if(!cur || cur.id === "p-login") go("p-member");
   fillCheckout();
   syncLoginTip();
+  if(mask) mask.style.display = "none";
   if(!member.phone){ setTimeout(()=>openEdit(true), 200); }
 };
 function syncLoginTip(){
@@ -1121,6 +1130,13 @@ if(cfg.apiKey && cfg.projectId){
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    setTimeout(()=>{
+      const mk = document.getElementById("loading-mask");
+      if(mk && mk.style.display === "flex"){
+        mk.style.display = "none";
+        alert("登入耗時過久，請重新整理頁面再試一次。");
+      }
+    }, 20000);
     const app = initializeApp(cfg);
     const db = getFirestore(app);
     const auth = getAuth(app);
@@ -1161,6 +1177,8 @@ if(cfg.apiKey && cfg.projectId){
     const qs = new URLSearchParams(location.search);
     const lineCode = qs.get("code");
     if(lineCode){
+      const mask = document.getElementById("loading-mask");
+      if(mask) mask.style.display = "flex";
       try{
         const r = await fetch("https://asia-east1-sandaichuan-tw.cloudfunctions.net/lineLogin", {
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -1168,8 +1186,16 @@ if(cfg.apiKey && cfg.projectId){
         });
         const d = await r.json();
         if(d.token){ await signInWithCustomToken(auth, d.token); }
-        else { console.error("LINE 登入失敗", d); alert("LINE 登入失敗，請再試一次。"); }
-      }catch(e){ console.error(e); alert("LINE 登入發生錯誤。"); }
+        else {
+          console.error("LINE 登入失敗", d);
+          if(mask) mask.style.display = "none";
+          alert("LINE 登入失敗\n" + (d.error||"") + "\n請再試一次。");
+        }
+      }catch(e){
+        console.error(e);
+        if(mask) mask.style.display = "none";
+        alert("LINE 登入發生錯誤\n" + (e.message||"") + "\n請再試一次。");
+      }
       history.replaceState({}, "", location.pathname);
     }
 
@@ -1191,7 +1217,7 @@ if(cfg.apiKey && cfg.projectId){
           return tb - ta;
         });
         return arr;
-      }catch(e){ console.error("讀取訂單失敗", e); alert("讀取訂單失敗，請稍後再試。"); return []; }
+      }catch(e){ console.error("讀取訂單失敗", e); return []; }
     };
     window.fbSaveMember = async (uid, data)=>{
       try{ await setDoc(doc(db,"members",uid), data, {merge:true}); }catch(e){ console.error(e); }
