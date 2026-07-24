@@ -13,6 +13,20 @@
   header{background:var(--wine);color:var(--cream);padding:14px 16px;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;}
   header .t{font-size:16px;font-weight:700;letter-spacing:3px;font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;flex:1;}
   header button{border:1px solid var(--cream);background:none;color:var(--cream);border-radius:3px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  .cp-fld{margin-bottom:11px;}
+  .cp-fld label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;}
+  .cp-fld input,.cp-fld select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;
+    font-size:14px;font-family:inherit;background:#fff;color:var(--ink);}
+  .cp-fld input:focus,.cp-fld select:focus{outline:none;border-color:var(--wine);}
+  .seg{display:flex;gap:6px;}
+  .seg-b{flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:6px;
+    padding:9px 0;font-size:13px;font-family:inherit;cursor:pointer;}
+  .seg-b.on{background:var(--wine);color:var(--cream);font-weight:700;}
+  .cp-row{background:#fff;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:8px;
+    display:flex;align-items:center;gap:10px;font-size:13px;}
+  .cp-row .n{flex:1;font-weight:700;}
+  .cp-row .s{font-size:11px;color:var(--ink-soft);margin-top:3px;font-weight:400;line-height:1.6;}
+  .cp-row .c{font-size:11.5px;color:var(--wine);font-weight:700;text-align:right;}
   .ch-bar{display:flex;gap:6px;padding:12px 16px 0;}
   .ch-btn{flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:6px;
     padding:9px 0;font-size:13px;font-family:inherit;cursor:pointer;letter-spacing:1px;}
@@ -254,6 +268,50 @@
         </div>
       </div>
 
+      <div class="mi">
+        <div class="mi-h" style="margin-bottom:10px;"><span class="nm">優惠券</span></div>
+        <div class="hint" style="margin:0 0 10px;">建立後發送給指定會員。優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。</div>
+
+        <div class="cp-fld"><label>券名稱</label><input id="cp-name" placeholder="例：八月會員日 50 元折價券"></div>
+
+        <div class="cp-fld"><label>折扣方式</label>
+          <div class="seg">
+            <button class="seg-b on" id="cp-t-amount" onclick="setCpType('amount')">折抵金額</button>
+            <button class="seg-b" id="cp-t-percent" onclick="setCpType('percent')">打折</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <div class="cp-fld" style="flex:1;"><label id="cp-vlabel">折抵金額</label>
+            <input type="number" id="cp-value" min="1" value="50"></div>
+          <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+            <input type="number" id="cp-min" min="0" value="0"></div>
+        </div>
+
+        <div class="cp-fld"><label>有效期限</label><input type="date" id="cp-exp"></div>
+
+        <div class="cp-fld"><label>適用通路</label>
+          <div id="cp-ch" class="seg"></div>
+          <div class="hint" style="margin-top:5px;">可複選，至少選一個</div>
+        </div>
+
+        <div class="cp-fld"><label>發送對象</label>
+          <select id="cp-target" onchange="countTargets()">
+            <option value="all">全部會員</option>
+            <option value="lv1">滷林高手以上</option>
+            <option value="lv2">滷味宗師以上</option>
+            <option value="lv3">滷味霸主</option>
+            <option value="bday">本月壽星</option>
+          </select>
+          <div class="hint" id="cp-count">計算中…</div>
+        </div>
+
+        <button class="btn btn-full" id="cp-send" onclick="sendCoupon()">發 送 優 惠 券</button>
+
+        <div class="cat-title" style="margin-top:18px;">已 發 送 紀 錄</div>
+        <div id="cp-list"><div class="hint">尚無紀錄</div></div>
+      </div>
+
       <div class="mi" style="background:var(--cream-soft);">
         <div class="mi-h"><span class="nm">開放線上付款（信用卡／LINE Pay）</span><span class="sw-lb" id="lb-onlinePay"></span>
           <button class="switch" id="sw-onlinePay"></button></div>
@@ -287,7 +345,7 @@ if(!cfg.apiKey){ document.body.innerHTML = "<p style='padding:40px;text-align:ce
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
 const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-const { getFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction } =
+const { getFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction, getDocs, addDoc } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
 
 const app = initializeApp(cfg);
@@ -334,6 +392,110 @@ function curSet(){
 }
 /* 為了沿用既有函式，SHOP 指向目前通路 */
 Object.defineProperty(window, "SHOP", { get: ()=>curSet() });
+
+/* ══ 優惠券 ══ */
+let CP_TYPE = "amount";
+let CP_CH = ["fs","sm","dl"];
+let MEMBERS_CACHE = [];
+const LV_NEED = [0, 2000, 6000, 12000];
+
+window.setCpType = t=>{
+  CP_TYPE = t;
+  $("cp-t-amount").classList.toggle("on", t==="amount");
+  $("cp-t-percent").classList.toggle("on", t==="percent");
+  $("cp-vlabel").textContent = t==="amount"? "折抵金額" : "折數（例 9 = 九折）";
+  $("cp-value").value = t==="amount"? 50 : 9;
+};
+function renderCpCh(){
+  const el = $("cp-ch"); if(!el) return;
+  el.innerHTML = CH.map(c=>
+    `<button class="seg-b ${CP_CH.includes(c.k)?"on":""}" onclick="toggleCpCh('${c.k}')">${c.n}</button>`).join("");
+}
+window.toggleCpCh = k=>{
+  CP_CH = CP_CH.includes(k)? CP_CH.filter(x=>x!==k) : [...CP_CH, k];
+  if(!CP_CH.length) CP_CH = [k];
+  renderCpCh();
+};
+async function loadMembers(){
+  try{
+    const snap = await getDocs(collection(db,"members"));
+    MEMBERS_CACHE = snap.docs.map(d=>({uid:d.id, ...d.data()}));
+  }catch(e){ console.error("讀取會員失敗", e); MEMBERS_CACHE = []; }
+}
+function targetMembers(){
+  const t = $("cp-target").value;
+  const mth = new Date().getMonth()+1;
+  return MEMBERS_CACHE.filter(m=>{
+    const sp = m.spent || 0;
+    if(t==="all") return true;
+    if(t==="lv1") return sp >= LV_NEED[1];
+    if(t==="lv2") return sp >= LV_NEED[2];
+    if(t==="lv3") return sp >= LV_NEED[3];
+    if(t==="bday") return m.birth && (+m.birth.split("-")[1] === mth);
+    return false;
+  });
+}
+window.countTargets = ()=>{
+  const n = targetMembers().length;
+  $("cp-count").innerHTML = `目前符合條件：<b>${n}</b> 位會員`;
+  $("cp-send").textContent = n? `發 送 給 ${n} 位 會 員` : "沒有符合條件的會員";
+  $("cp-send").disabled = !n;
+};
+window.sendCoupon = async ()=>{
+  const name = $("cp-name").value.trim();
+  const val = +$("cp-value").value;
+  const min = +($("cp-min").value || 0);
+  const exp = $("cp-exp").value;
+  if(!name){ alert("請填寫券名稱"); return; }
+  if(!val || val<=0){ alert("請填寫有效的折扣值"); return; }
+  if(CP_TYPE==="percent" && (val<1 || val>9.9)){ alert("折數請填 1～9.9（例：9 = 九折）"); return; }
+  if(!exp){ alert("請選擇有效期限"); return; }
+  const list = targetMembers();
+  if(!list.length){ alert("沒有符合條件的會員"); return; }
+  if(!confirm(`確定發送「${name}」給 ${list.length} 位會員？`)) return;
+
+  const btn = $("cp-send");
+  btn.disabled = true; btn.textContent = "發送中…";
+  try{
+    const cref = await addDoc(collection(db,"coupons"), {
+      name, type:CP_TYPE, value:val, minSpend:min, expire:exp,
+      channels:[...CP_CH], target:$("cp-target").value,
+      issued:list.length, used:0, createdAt: serverTimestamp()
+    });
+    for(const m of list){
+      await setDoc(doc(db,"usercoupons", m.uid + "_" + cref.id), {
+        uid:m.uid, cid:cref.id, name, type:CP_TYPE, value:val, minSpend:min,
+        expire:exp, channels:[...CP_CH], used:false, createdAt: serverTimestamp()
+      });
+    }
+    toast(`已發送 ${list.length} 張`);
+    $("cp-name").value = "";
+    loadCoupons();
+  }catch(e){
+    console.error("發送失敗", e);
+    alert("發送失敗\n" + (e.code||"") + "\n" + (e.message||""));
+  }
+  btn.disabled = false; countTargets();
+};
+async function loadCoupons(){
+  try{
+    const snap = await getDocs(collection(db,"coupons"));
+    const arr = snap.docs.map(d=>({id:d.id, ...d.data()}))
+      .sort((a,b)=>(b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0));
+    const today = new Date().toISOString().slice(0,10);
+    $("cp-list").innerHTML = arr.length? arr.map(c=>{
+      const chn = (c.channels||[]).map(k=>(CH.find(x=>x.k===k)||{}).n).filter(Boolean).join("、");
+      const expired = c.expire < today;
+      return `<div class="cp-row" style="${expired?"opacity:.55;":""}">
+        <div class="n">${c.name}
+          <div class="s">${c.type==="amount"? "折抵 "+c.value+" 元" : c.value+" 折"}
+            ${c.minSpend? "・滿 "+c.minSpend:""}<br>${c.expire.replace(/-/g,"/")} 到期${expired?"（已過期）":""}<br>${chn}</div>
+        </div>
+        <div class="c">${c.issued||0} 張<br><span style="font-weight:400;color:var(--ink-soft);">已用 ${c.used||0}</span></div>
+      </div>`;
+    }).join("") : `<div class="hint">尚無紀錄</div>`;
+  }catch(e){ console.error(e); $("cp-list").innerHTML = `<div class="hint">讀取失敗</div>`; }
+}
 
 /* ── 公休日日曆（分通路） ── */
 const WDN = ["日","一","二","三","四","五","六"];
@@ -578,7 +740,6 @@ function onOrders(list){
 }
 async function refetch(){
   try{
-    const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const snap = await getDocs(collection(db,"orders"));
     onOrders(sortOrders(snap.docs.map(d=>({docId:d.id, ...d.data()}))));
   }catch(e){ console.error(e); }
@@ -599,6 +760,12 @@ function startData(){
   setInterval(()=>{ if(!document.hidden && openSet.size===0) refetch(); }, 5000);
   loadMenu();
   loadSettings();
+  (async ()=>{
+    await loadMembers();
+    renderCpCh(); countTargets(); loadCoupons();
+    const d = new Date(); d.setMonth(d.getMonth()+1);
+    $("cp-exp").value = d.toISOString().slice(0,10);
+  })();
 }
 document.querySelectorAll(".tab[data-st]").forEach(b=>b.onclick=()=>{
   stF = b.dataset.st;
@@ -628,6 +795,7 @@ function buildTicket(o){
   });
   L.push("------------------------------");
   if(o.shipFee) L.push(padTo("運費",23) + o.shipFee);
+  if(o.couponDiscount) L.push(padTo("優惠券",23) + "-" + o.couponDiscount);
   if(o.pointsUsed) L.push(padTo("點數折抵",21) + "-" + o.pointsUsed);
   L.push(padTo("合計",23) + (o.total||0));
   L.push(o.payMethod==="cash" ? "** 現金應收 " + (o.total||0) + " 元 **" : "( 線上已付款 )");
@@ -689,6 +857,9 @@ async function settlePoints(id){
       const pts = (m.points||0) - (o.pointsUsed||0) + (o.pointsEarn||0);
       const spent = (m.spent||0) + (o.total||0);
       tx.set(mRef, {points: Math.max(0, pts), spent}, {merge:true});
+      if(o.couponUid){
+        tx.set(doc(db,"usercoupons",o.couponUid), {used:true, usedAt: serverTimestamp(), orderNo:o.orderNo||""}, {merge:true});
+      }
       tx.update(oRef, {pointsSettled:true, pointsSettledAt: serverTimestamp()});
     });
   }catch(e){ console.error("點數結算失敗", e); toast("點數結算失敗"); }
@@ -752,6 +923,7 @@ function renderOrders(){
         <div class="o-items">
           ${(o.items||[]).map(x=>`<div class="r"><span>${x.name} × ${x.qty}</span><span>${money(x.price*x.qty)}</span></div>`).join("")}
           <div class="r"><span>運費</span><span>${isPk?"自取免運":(o.shipFee? money(o.shipFee):"免運")}</span></div>
+          ${o.couponDiscount? `<div class="r"><span>優惠券（${o.couponName||""}）</span><span>- ${money(o.couponDiscount)}</span></div>`:""}
           ${o.pointsUsed? `<div class="r"><span>點數折抵</span><span>- ${money(o.pointsUsed)}</span></div>`:""}
           <div class="r tt"><span>合計${o.payMethod==="cash"?"（現金應收）":""}</span><span>${money(o.total)}</span></div>
           ${o.pointsEarn? `<div class="r" style="font-size:12px;color:var(--ink-soft);"><span>回饋點數</span><span>${o.pointsEarn} 點${o.pointsSettled?"（已入帳）":"（完成後入帳）"}</span></div>`:""}

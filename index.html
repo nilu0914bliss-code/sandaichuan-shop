@@ -215,6 +215,31 @@
     min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
   .page{padding-bottom:70px;}
   /* 公告卡 */
+  .cp-tabs{display:flex;gap:8px;margin-bottom:14px;}
+  .cp-tabs button{flex:1;border:1px solid var(--line);background:#fff;color:var(--ink-soft);border-radius:20px;
+    padding:8px 0;font-size:13px;font-family:inherit;cursor:pointer;}
+  .cp-tabs button.on{background:var(--wine);color:var(--cream);border-color:var(--wine);font-weight:700;}
+  .cp{position:relative;background:#fff;border-radius:12px;margin-bottom:12px;display:flex;overflow:hidden;
+    box-shadow:0 1px 2px rgba(111,34,34,.05),0 6px 20px rgba(111,34,34,.08);}
+  .cp .amt{width:104px;flex-shrink:0;background:linear-gradient(160deg,#7A2727,#5A1B1B);color:var(--cream);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 8px;}
+  .cp .amt .v{font-size:30px;font-weight:800;line-height:1;letter-spacing:-1px;}
+  .cp .amt .u{font-size:11px;opacity:.85;margin-top:4px;letter-spacing:2px;}
+  .cp .cbody{flex:1;padding:14px;position:relative;}
+  .cp .nm{font-size:15px;font-weight:700;letter-spacing:.5px;}
+  .cp .cond{font-size:11.5px;color:var(--ink-soft);margin-top:5px;line-height:1.7;}
+  .cp .exp{font-size:11px;color:var(--gold);margin-top:7px;font-weight:700;}
+  .cp.dead{opacity:.45;}
+  .cp.dead .amt{background:#9A9089;}
+  .cp .stamp{position:absolute;right:10px;top:50%;transform:translateY(-50%) rotate(-12deg);
+    border:2px solid #9A9089;color:#9A9089;font-size:12.5px;font-weight:800;padding:4px 10px;border-radius:4px;letter-spacing:2px;}
+  .cp-pick{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .cp-pick.on{border-color:var(--wine);background:#F7E9E3;}
+  .cp-pick .l{flex:1;}
+  .cp-pick .t{font-size:14px;font-weight:700;}
+  .cp-pick .d{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+  .cp-pick .go{font-size:12px;color:var(--wine);}
   .ch-splash{padding:34px 22px;text-align:center;}
   .ch-logo{font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;font-size:26px;font-weight:700;letter-spacing:8px;color:var(--wine);}
   .ch-en{font-size:10px;letter-spacing:4px;color:var(--gold);margin-top:4px;}
@@ -254,6 +279,15 @@
   <div style="font-size:12px;color:#7A6353;">首次登入需要幾秒鐘</div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<!-- ══════ 我的優惠券 ══════ -->
+<div class="page" id="p-coupon">
+  <div class="topbar"><button class="back" onclick="go('p-member')">‹</button><h2>我的優惠券</h2></div>
+  <div style="padding:16px;">
+    <div class="cp-tabs" id="cp-tabs"></div>
+    <div id="cp-body"></div>
+  </div>
+</div>
 
 <!-- ══════ 頁0：選取貨點 ══════ -->
 <div class="page" id="p-pickch">
@@ -355,6 +389,12 @@
       </div>
     </div>
     <div class="field"><label>備註</label><textarea id="f-note" rows="2" placeholder="其他需求（選填）"></textarea></div>
+
+    <div id="cp-box" style="display:none;">
+      <div class="f-sec">優 惠 券</div>
+      <div class="hint" style="margin:-2px 0 8px;">優惠券與點數<b>擇一使用</b></div>
+      <div id="cp-options"></div>
+    </div>
 
     <div id="pt-box" style="display:none;">
       <div class="f-sec">點 數 折 抵</div>
@@ -722,8 +762,48 @@ function setShipMethod(m){
   shipMethod = m;
   applyShopUI();
   renderPayOpts();
+  renderCpBox();
   renderPtBox();
   updateCkSummary();
+}
+let cpSel = null;   /* 選用的優惠券 docId */
+function usableCoupons(){
+  const sub = totals().sub;
+  return MY_CP.filter(c=>cpUsable(c) && cpDiscount(c, sub) > 0);
+}
+function bestCoupon(){
+  const sub = totals().sub;
+  let best = null, bv = 0;
+  usableCoupons().forEach(c=>{
+    const v = cpDiscount(c, sub);
+    if(v > bv){ bv = v; best = c; }
+  });
+  return best;
+}
+function curCoupon(){ return MY_CP.find(c=>c.docId===cpSel) || null; }
+function cpValue(){
+  const c = curCoupon();
+  return c? cpDiscount(c, totals().sub) : 0;
+}
+window.selCoupon = id=>{
+  cpSel = (cpSel===id)? null : id;
+  if(cpSel) setPt(0);
+  renderCpBox(); renderPtBox(); updateCkSummary();
+};
+function renderCpBox(){
+  const box = $("cp-box"); if(!box) return;
+  const list = usableCoupons();
+  if(!member || !list.length){ box.style.display = "none"; cpSel = null; return; }
+  box.style.display = "block";
+  const sub = totals().sub;
+  $("cp-options").innerHTML = list.map(c=>`
+    <div class="cp-pick ${cpSel===c.docId?"on":""}" onclick="selCoupon('${c.docId}')" style="margin-bottom:8px;">
+      <div class="l">
+        <div class="t">${c.name}　−${money(cpDiscount(c, sub))}</div>
+        <div class="d">${c.minSpend? "滿 "+money(c.minSpend)+" 可用・":""}${c.expire.replace(/-/g,"/")} 到期</div>
+      </div>
+      <span class="go">${cpSel===c.docId? "已選用 ✓":"選用 ›"}</span>
+    </div>`).join("");
 }
 let ptUse = 0;
 function maxPoints(){
@@ -735,6 +815,7 @@ function maxPoints(){
 function setPt(v){
   const mx = maxPoints();
   ptUse = Math.max(0, Math.min(mx, Math.floor(+v || 0)));
+  if(ptUse > 0 && cpSel){ cpSel = null; renderCpBox(); }
   const inp = $("pt-input"); if(inp) inp.value = ptUse || "";
   updateCkSummary();
 }
@@ -742,7 +823,7 @@ function useAllPt(){ setPt(maxPoints()); }
 function renderPtBox(){
   const box = $("pt-box"); if(!box) return;
   const avail = (member && (member.available ?? member.points)) || 0;
-  if(!member || avail <= 0){ box.style.display = "none"; ptUse = 0; return; }
+  if(!member || avail <= 0 || cpSel){ box.style.display = "none"; if(cpSel) ptUse = 0; return; }
   box.style.display = "block";
   $("pt-avail").textContent = avail;
   const mx = maxPoints();
@@ -752,14 +833,16 @@ function updateCkSummary(){
   const t = totals();
   const ship = shipMethod==="pickup"? 0 : t.ship;
   const gross = t.sub + ship;
-  const use = Math.min(ptUse, gross);
+  const cpv = Math.min(cpValue(), gross);
+  const use = cpv? 0 : Math.min(ptUse, gross - cpv);
   const lv = member? levelOf(member.spent) : LEVELS[0];
-  const earn = Math.floor((gross - use) / 100) * lv.rate;
+  const earn = Math.floor((gross - use - cpv) / 100) * lv.rate;
   $("ck-summary").innerHTML = `
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
     <div class="row"><span>運費</span><span>${shipMethod==="pickup"?"自取免運":(ship===0?"免運":money(ship))}</span></div>
+    ${cpv? `<div class="row" style="color:var(--gold);"><span>優惠券</span><span>- ${money(cpv)}</span></div>`:""}
     ${use? `<div class="row" style="color:var(--gold);"><span>點數折抵</span><span>- ${money(use)}</span></div>`:""}
-    <div class="row total"><span>應付</span><span>${money(gross-use)}</span></div>
+    <div class="row total"><span>應付</span><span>${money(gross-use-cpv)}</span></div>
     ${member? `<div class="row" style="font-size:12px;color:var(--ink-soft);"><span>本單可得點數</span><span>${earn} 點</span></div>`:""}`;
 }
 let payway = "card";
@@ -790,8 +873,10 @@ function openCheckout(){
   if(!c || !chOpen(c.k)){ alert("請先選擇取貨點。"); renderChList(); go("p-pickch"); return; }
   shipMethod = c.type;
   if(c.type==="pickup"){ $("f-pmarket").value = c.n; }
-  ptUse = 0;
-  go("p-checkout"); setShipMethod(shipMethod); renderPtBox();
+  ptUse = 0; cpSel = null;
+  const bc = bestCoupon();
+  if(bc) cpSel = bc.docId;
+  go("p-checkout"); setShipMethod(shipMethod); renderCpBox(); renderPtBox();
 }
 async function pay(){
   if(shipMethod==="pickup"){
@@ -809,8 +894,10 @@ async function pay(){
   const tt = totals();
   const shipFee = shipMethod==="pickup"? 0 : tt.ship;
   const gross = tt.sub + shipFee;
-  const ptApplied = member? Math.min(ptUse, gross) : 0;
-  const grand = gross - ptApplied;
+  const cpApplied = member? Math.min(cpValue(), gross) : 0;
+  const cpDoc = curCoupon();
+  const ptApplied = (member && !cpApplied)? Math.min(ptUse, gross) : 0;
+  const grand = gross - ptApplied - cpApplied;
   const myLv = member? levelOf(member.spent) : LEVELS[0];
   const ptEarn = Math.floor(grand / 100) * myLv.rate;
   const items = Object.entries(cart).map(([k,q])=>{
@@ -825,6 +912,9 @@ async function pay(){
     sauce:sauceSel, note:$("f-note").value.trim(),
     items, subtotal:tt.sub, shipFee,
     pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
+    couponUid: cpDoc? cpDoc.docId : null,
+    couponName: cpDoc? cpDoc.name : "",
+    couponDiscount: cpApplied,
     total: grand
   };
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
@@ -875,11 +965,12 @@ async function pay(){
     const el = $("done-points");
     if(el){
       el.style.display = "block";
-      el.innerHTML = (ptApplied? `本單折抵 <b>${ptApplied}</b> 點<br>`:"") +
+      el.innerHTML = (cpApplied? `已使用優惠券折抵 <b>${money(cpApplied)}</b><br>`:"") +
+        (ptApplied? `本單折抵 <b>${ptApplied}</b> 點<br>`:"") +
         `完成取貨後可獲得 <b>${ptEarn}</b> 點`;
     }
   }
-  ptUse = 0;
+  ptUse = 0; cpSel = null;
   $("order-no").textContent = no;
   $("done-paid").textContent = payway==="cash"? "訂單成立・取貨時現金付款":"訂單已成立・待付款";
   const payNote = (payway!=="cash" && !window.PAY_LIVE)
@@ -974,6 +1065,7 @@ window.onMemberLogin = async (uid, m)=>{
     points: m.points || 0, spent: m.spent || 0
   };
   await refreshMyOrders();
+  await refreshCoupons();
   renderMember();
   const cur = document.querySelector(".page.show");
   if(!cur || cur.id === "p-login") go("p-member");
@@ -1045,6 +1137,12 @@ function openEdit(first){
   const box = $("edit-box"); if(!box) return;
   $("ed-phone").value = member.phone || "";
   $("ed-birth").value = member.birth || "";
+  const locked = !!member.birth;
+  $("ed-birth").disabled = locked;
+  $("ed-birth").style.background = locked? "#F0EDE9" : "#fff";
+  $("ed-birth-hint").innerHTML = locked
+    ? "生日設定後<b>不可自行修改</b>，如需更正請聯繫店家。"
+    : "生日當月訂購，該筆訂單加贈「滷味驚喜包」。<b>只能設定一次</b>，請確認後再儲存。";
   const t = $("ed-title"), c = $("ed-cancel");
   if(t) t.textContent = first? "歡 迎 加 入 ・ 請 填 手 機" : "修 改 會 員 資 料";
   if(c) c.style.display = first? "none" : "block";
@@ -1053,15 +1151,72 @@ function openEdit(first){
 }
 function closeEdit(){ const b = $("edit-box"); if(b) b.style.display = "none"; }
 async function saveProfile(){
-  const p = $("ed-phone").value.trim(), bd = $("ed-birth").value;
+  const p = $("ed-phone").value.trim();
   if(!p){ alert("請填寫手機號碼"); return; }
-  member.phone = p; member.birth = bd || "";
+  const hadBirth = !!member.birth;
+  const bd = hadBirth ? member.birth : $("ed-birth").value;
+  if(!hadBirth && bd && !confirm("生日設定後就不能自己修改了。\n確定是 " + bd.replace(/-/g,"/") + " 嗎？")) return;
+  member.phone = p;
+  if(!hadBirth) member.birth = bd || "";
   if(member.uid && window.fbSaveMember){
-    await window.fbSaveMember(member.uid, {phone:p, birth: bd || ""});
+    const payload = {phone:p};
+    if(!hadBirth && bd) payload.birth = bd;
+    await window.fbSaveMember(member.uid, payload);
   }
   closeEdit(); renderMember(); fillCheckout();
   alert("資料已更新");
 }
+/* ══ 優惠券 ══ */
+let MY_CP = [];
+let cpTab = "ok";
+const todayISO = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+function cpUsable(c){
+  if(c.used) return false;
+  if(c.expire < todayISO()) return false;
+  if(MY_CH && c.channels && !c.channels.includes(MY_CH)) return false;
+  return true;
+}
+function cpFace(c){
+  return c.type==="amount"
+    ? `<div class="v">${c.value}</div><div class="u">元</div>`
+    : `<div class="v">${c.value}<span style="font-size:17px;">折</span></div><div class="u">全 單</div>`;
+}
+function cpDiscount(c, sub){
+  if(c.minSpend && sub < c.minSpend) return 0;
+  if(c.type==="amount") return Math.min(c.value, sub);
+  return Math.floor(sub * (10 - c.value) / 10);
+}
+async function refreshCoupons(){
+  if(!member || !window.fbLoadCoupons){ MY_CP = []; return; }
+  MY_CP = await window.fbLoadCoupons(member.uid);
+}
+window.openCoupons = ()=>{ cpTab = "ok"; renderCoupons(); go("p-coupon"); };
+function renderCoupons(){
+  const t = todayISO();
+  const groups = {
+    ok:  MY_CP.filter(c=>!c.used && c.expire>=t),
+    used:MY_CP.filter(c=>c.used),
+    exp: MY_CP.filter(c=>!c.used && c.expire<t)
+  };
+  $("cp-tabs").innerHTML = [["ok","可使用"],["used","已使用"],["exp","已過期"]].map(([k,n])=>
+    `<button class="${cpTab===k?"on":""}" onclick="setCpTab('${k}')">${n}${groups[k].length? " "+groups[k].length:""}</button>`).join("");
+  const list = groups[cpTab];
+  $("cp-body").innerHTML = list.length ? list.map(c=>{
+    const dead = cpTab!=="ok";
+    const chn = (c.channels||[]).map(k=>(CH.find(x=>x.k===k)||{}).n).filter(Boolean).join("、");
+    return `<div class="cp ${dead?"dead":""}">
+      <div class="amt">${cpFace(c)}</div>
+      <div class="cbody">
+        <div class="nm">${c.name}</div>
+        <div class="cond">${c.minSpend? "單筆滿 "+money(c.minSpend)+" 可用":"無低消門檻"}<br>${chn} 適用</div>
+        <div class="exp">${c.expire.replace(/-/g,"/")} 到期</div>
+        ${cpTab==="used"? `<div class="stamp">已使用</div>` : cpTab==="exp"? `<div class="stamp">已過期</div>`:""}
+      </div>
+    </div>`;
+  }).join("") : `<div class="empty">目前沒有${cpTab==="ok"?"可用的":cpTab==="used"?"已使用的":"過期的"}優惠券。</div>`;
+}
+window.setCpTab = k=>{ cpTab = k; renderCoupons(); };
+
 function togglePerks(){
   const p = $("perks"); if(p) p.style.display = p.style.display==="none"? "block":"none";
 }
@@ -1122,14 +1277,18 @@ function renderMemberInner(){
         <div class="hint">用於訂單聯絡與取貨通知</div>
       </div>
       <div class="field"><label>出生年月日</label><input type="date" id="ed-birth">
-        <div class="hint">生日當月訂購，該筆訂單加贈「滷味驚喜包」</div>
+        <div class="hint" id="ed-birth-hint">生日當月訂購，該筆訂單加贈「滷味驚喜包」</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-line" id="ed-cancel" style="flex:1;padding:11px 0;" onclick="closeEdit()">取消</button>
         <button class="btn" style="flex:1;padding:11px 0;background:var(--wine);color:var(--cream);" onclick="saveProfile()">儲存</button>
       </div>
     </div>
-    <div style="margin:16px 0 0;"><button class="btn" style="width:100%;padding:14px;border-radius:12px;background:#fff;border:1px solid var(--line);color:#6E655E;font-size:13.5px;font-weight:500;" onclick="openEdit()">編輯會員資料${member.birth? "":"・補填生日享生日禮"}</button></div>
+    <div style="margin:16px 0 0;"><button class="btn" style="width:100%;padding:14px;border-radius:12px;background:#fff;border:1px solid var(--line);color:var(--ink);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between;" onclick="openCoupons()">
+      <span>🎟 我的優惠券</span>
+      <span style="color:var(--wine);">${MY_CP.filter(c=>!c.used && c.expire>=todayISO()).length} 張可用 ›</span>
+    </button></div>
+    <div style="margin:10px 0 0;"><button class="btn" style="width:100%;padding:14px;border-radius:12px;background:#fff;border:1px solid var(--line);color:#6E655E;font-size:13.5px;font-weight:500;" onclick="openEdit()">編輯會員資料${member.birth? "":"・補填生日享生日禮"}</button></div>
     ${isBirthMonth()? `<div class="bday-box">本月是您的生日月——本月訂購，訂單加贈<b>滷味驚喜包</b>！</div>`:""}
     <div class="sect">
       <div class="sect-h">
@@ -1178,6 +1337,7 @@ function openOrder(i){
     <div class="m-card">
       ${o.items.map(x=>`<div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;"><span>${x[0]} × ${x[1]}</span><span>${money(x[1]*x[2])}</span></div>`).join("")}
       <div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;"><span>運費</span><span>${o.type==="pickup"?"自取免運":(o.shipFee? money(o.shipFee):"免運")}</span></div>
+      ${o.couponDiscount? `<div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;color:var(--gold);"><span>優惠券 ${o.couponName||""}</span><span>- ${money(o.couponDiscount)}</span></div>`:""}
       ${o.pointsUsed? `<div style="display:flex;justify-content:space-between;font-size:13.5px;line-height:2;color:var(--gold);"><span>點數折抵</span><span>- ${money(o.pointsUsed)}</span></div>`:""}
       <div style="display:flex;justify-content:space-between;font-weight:800;color:var(--wine);border-top:1px dashed var(--line);margin-top:4px;padding-top:6px;"><span>${o.payMethod==="cash"?"取貨應付":"應付金額"}</span><span>${money(o.total)}</span></div>
     </div>
@@ -1378,6 +1538,13 @@ if(cfg.apiKey && cfg.projectId){
         });
         return arr;
       }catch(e){ console.error("讀取訂單失敗", e); return []; }
+    };
+    window.fbLoadCoupons = async (uid)=>{
+      try{
+        const snap = await getDocs(query(collection(db,"usercoupons"), where("uid","==",uid)));
+        return snap.docs.map(x=>({docId:x.id, ...x.data()}))
+          .sort((a,b)=> String(a.expire||"").localeCompare(String(b.expire||"")));
+      }catch(e){ console.error("讀取優惠券失敗", e); return []; }
     };
     window.fbSaveMember = async (uid, data)=>{
       try{ await setDoc(doc(db,"members",uid), data, {merge:true}); }catch(e){ console.error(e); }
