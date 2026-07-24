@@ -166,7 +166,7 @@
 <!-- 主畫面 -->
 <div id="main" style="display:none;">
   <div class="shopbar" id="shopbar" style="display:none;">
-  <span class="sb-lb">本機門市</span>
+  <span class="sb-lb">目前通路</span>
   <span class="sb-cur" id="shop-cur">—</span>
   <button onclick="openShopPick()">切換</button>
 </div>
@@ -175,9 +175,9 @@
   <div class="mbox">
     <h3>本 機 門 市</h3>
     <p>這台裝置放在哪個攤位？<br>選好之後只會收到該攤位的訂單與提示音。</p>
-    <button class="opt" data-s="鳳山工協" onclick="pickShop('鳳山工協')"><i>🏪</i><span>鳳山工協<small>只收這個市場的自取單</small></span></button>
-    <button class="opt" data-s="三民陽明" onclick="pickShop('三民陽明')"><i>🏪</i><span>三民陽明<small>只收這個市場的自取單</small></span></button>
-    <button class="opt" data-s="全部門市" onclick="pickShop('全部門市')"><i>👀</i><span>全部門市<small>所有訂單與宅配單（老闆用）</small></span></button>
+    <button class="opt" data-s="fs" onclick="pickShop('fs')"><i>🏪</i><span>鳳山工協<small>訂單、菜單、設定都切到這攤</small></span></button>
+    <button class="opt" data-s="sm" onclick="pickShop('sm')"><i>🏪</i><span>三民陽明<small>訂單、菜單、設定都切到這攤</small></span></button>
+    <button class="opt" data-s="dl" onclick="pickShop('dl')"><i>🧊</i><span>冷凍宅配<small>宅配訂單與宅配價格</small></span></button>
   </div>
 </div>
 
@@ -200,11 +200,7 @@
       <button class="tab" data-st="cancelled">已取消</button>
       <button class="tab" data-st="all">全部</button>
     </div>
-    <div class="tabs" style="padding-top:0;align-items:center;">
-      <span style="font-size:12px;color:var(--ink-soft);letter-spacing:2px;flex:none;">類型：</span>
-      <button class="tab tf" data-tf="pickup" style="flex:none;padding:8px 22px;">自取</button>
-      <button class="tab tf" data-tf="delivery" style="flex:none;padding:8px 22px;">宅配</button>
-    </div>
+
     <div style="display:flex;gap:8px;align-items:center;padding:12px 16px 0;">
       <button class="btn btn-w" style="flex:1;" onclick="printToday()">列印今日自取單</button>
       <span class="sw-lb">新單自動印</span>
@@ -219,7 +215,6 @@
   </div>
 
   <div class="view" id="v-set">
-    <div class="ch-bar" id="ch-bar-set"></div>
     <div class="m-wrap">
       <div class="ch-note" id="set-note"></div>
 
@@ -271,7 +266,6 @@
   </div>
 
   <div class="view" id="v-menu">
-    <div class="ch-bar" id="ch-bar-menu"></div>
     <div class="m-wrap" id="menu-body"><div class="empty">載入中…</div></div>
     <div class="save-bar"><button class="btn btn-full" id="btn-save-menu">儲存菜單變更</button></div>
   </div>
@@ -435,7 +429,6 @@ async function loadSettings(){
                                  s.exists()? s.data() : {});
     }
   }catch(e){ console.error("讀取設定失敗", e); }
-  renderChBar("menu"); renderChBar("set");
   renderSettings(); renderOff(); renderAnnPhoto();
 }
 $("btn-save-set").onclick = async ()=>{
@@ -447,7 +440,13 @@ $("btn-save-set").onclick = async ()=>{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
     await setDoc(doc(db,"settings","global"), GLOBAL, {merge:true});
     toast("已儲存（" + cur.n + "）");
-  }catch(e){ console.error(e); toast("儲存失敗"); }
+  }catch(e){
+    console.error("儲存設定失敗", e);
+    const who = (auth.currentUser && auth.currentUser.email) || "未登入";
+    alert("儲存失敗\n\n錯誤：" + (e.code||"") + "\n" + (e.message||"") +
+          "\n\n登入帳號：" + who +
+          "\n\n若顯示 permission-denied，代表此帳號不在 Firestore 規則的白名單中。");
+  }
 };
 
 /* ══ 通路（各自獨立的價格、庫存、公告、公休） ══ */
@@ -461,38 +460,39 @@ let EDIT_CH = "fs";   /* 目前正在編輯哪個通路 */
 
 /* ── 訂單 ── */
 let ORDERS = [];
-let stF = "today", tyF = "all";
+let stF = "today";
 /* ══ 本機門市（存在這台裝置） ══ */
 let MY_SHOP = "";
 try{ MY_SHOP = localStorage.getItem("sdc_shop") || ""; }catch(e){}
+if(MY_SHOP && !["fs","sm","dl"].includes(MY_SHOP)) MY_SHOP = "";
 function inMyShop(o){
-  if(MY_SHOP === "全部門市" || !MY_SHOP) return true;
-  if(o.type === "pickup") return o.pickup && o.pickup.market === MY_SHOP;
-  return false; /* 宅配單只在「全部門市」顯示 */
+  const c = CH.find(x=>x.k===MY_SHOP);
+  if(!c) return true;
+  if(c.type === "delivery") return o.type === "delivery";
+  return o.type === "pickup" && o.pickup && o.pickup.market === c.n;
 }
 window.openShopPick = ()=>{
   document.querySelectorAll("#shop-modal .opt").forEach(b=>b.classList.toggle("on", b.dataset.s===MY_SHOP));
   $("shop-modal").classList.add("on");
 };
-window.pickShop = v=>{
-  MY_SHOP = v;
-  try{ localStorage.setItem("sdc_shop", v); }catch(e){}
-  $("shop-cur").textContent = v;
+window.pickShop = k=>{
+  const c = CH.find(x=>x.k===k); if(!c) return;
+  MY_SHOP = k; EDIT_CH = k;
+  try{ localStorage.setItem("sdc_shop", k); }catch(e){}
+  $("shop-cur").textContent = c.n;
   $("shop-modal").classList.remove("on");
-  knownIds = null;              /* 換門市不要誤判成新單 */
-  const c = CH.find(x=>x.n===v);
-  if(c){ EDIT_CH = c.k; renderChBar("menu"); renderChBar("set"); renderMenu(); renderSettings(); renderOff(); renderAnnPhoto(); }
+  knownIds = null;              /* 換通路不要誤判成新單 */
+  dirty.clear();
+  renderMenu(); renderSettings(); renderOff(); renderAnnPhoto();
   renderOrders();
-  toast("已設定為「" + v + "」");
+  toast("已切換至「" + c.n + "」");
 };
 function syncShopBar(){
   $("shopbar").style.display = "flex";
-  $("shop-cur").textContent = MY_SHOP || "尚未設定";
-  if(MY_SHOP && MY_SHOP !== "全部門市"){
-    const c = CH.find(x=>x.n===MY_SHOP);
-    if(c) EDIT_CH = c.k;
-  }
-  if(!MY_SHOP) openShopPick();
+  const c = CH.find(x=>x.k===MY_SHOP);
+  $("shop-cur").textContent = c? c.n : "尚未設定";
+  if(c) EDIT_CH = c.k;
+  if(!c) openShopPick();
 }
 const ST_LABEL = {
   pending_payment: ["待付款","wait"],
@@ -605,11 +605,7 @@ document.querySelectorAll(".tab[data-st]").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tab[data-st]").forEach(x=>x.classList.toggle("on", x===b));
   renderOrders();
 });
-document.querySelectorAll(".tab[data-tf]").forEach(b=>b.onclick=()=>{
-  tyF = (tyF===b.dataset.tf)? "all" : b.dataset.tf;
-  document.querySelectorAll(".tab[data-tf]").forEach(x=>x.classList.toggle("on", x.dataset.tf===tyF));
-  renderOrders();
-});
+
 /* ══ 列印（Android + RawBT） ══ */
 function padTo(s,n){ s=String(s); return s + " ".repeat(Math.max(0, n-s.length)); }
 function buildTicket(o){
@@ -732,8 +728,7 @@ function renderOrders(){
     const isPre = active && o.type==="pickup" && o.pickup && o.pickup.date > t;
     const stOK = stF==="all" || (stF==="today"&&isTodayOrder) || (stF==="pre"&&isPre)
       || (stF==="done"&&isDone(o)) || (stF==="cancelled"&&isCancelled(o));
-    const tyOK = tyF==="all" || o.type===tyF;
-    return stOK && tyOK;
+    return stOK;
   });
   if(!show.length){ $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。</div>`; return; }
   $("list").innerHTML = show.map(({o})=>{
@@ -899,17 +894,7 @@ window.toggleItem = async idx=>{
 };
 window.markDirty = idx => dirty.add(idx);
 /* ── 通路切換列 ── */
-function renderChBar(which){
-  const el = $("ch-bar-" + which); if(!el) return;
-  el.innerHTML = CH.map(c=>
-    `<button class="ch-btn ${EDIT_CH===c.k?"on":""}" onclick="setEditCh('${c.k}')">${c.n}</button>`).join("");
-}
-window.setEditCh = k=>{
-  EDIT_CH = k;
-  dirty.clear();
-  renderChBar("menu"); renderChBar("set");
-  renderMenu(); renderSettings(); renderOff(); renderAnnPhoto();
-};
+
 /* 取得某商品在目前通路的設定 */
 function chData(p){
   const c = (p.ch && p.ch[EDIT_CH]) || {};
@@ -962,7 +947,7 @@ function renderMenu(){
 $("btn-save-menu").onclick = async ()=>{
   if(!dirty.size){ toast("沒有變更"); return; }
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
-  let ok = 0;
+  let ok = 0, lastErr = null;
   for(const idx of dirty){
     const p = PRODUCTS[idx];
     const limEl = $("lim-"+idx);
@@ -972,10 +957,16 @@ $("btn-save-menu").onclick = async ()=>{
     payload["ch."+EDIT_CH+".prices"] = prices;
     if(cur.type==="pickup") payload["ch."+EDIT_CH+".limit"] = (limRaw===""? null : +limRaw);
     try{ await updateDoc(doc(db,"products",p.docId), payload); ok++; }
-    catch(e){ console.error(e); }
+    catch(e){ console.error("儲存菜單失敗", e); lastErr = e; }
   }
   dirty.clear();
-  toast(`已儲存 ${ok} 個品項（${cur.n}）`);
+  if(lastErr){
+    const who = (auth.currentUser && auth.currentUser.email) || "未登入";
+    alert("部分品項儲存失敗\n\n錯誤：" + (lastErr.code||"") + "\n" + (lastErr.message||"") +
+          "\n\n登入帳號：" + who);
+  } else {
+    toast(`已儲存 ${ok} 個品項（${cur.n}）`);
+  }
 };
 </script>
 </body>
