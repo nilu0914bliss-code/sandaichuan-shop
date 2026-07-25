@@ -1119,6 +1119,11 @@ async function refreshMyOrders(){
   const held = list.filter(o=>!o.pointsSettled && o.status!=="cancelled")
                    .reduce((s,o)=> s + (o.pointsUsed||0), 0);
   member.available = Math.max(0, (member.points||0) - held);
+  /* 已被未完成訂單佔用的券（下了單還沒取貨、未取消）→ 不能再用 */
+  HELD_COUPONS = new Set(
+    list.filter(o=>o.couponUid && !o.pointsSettled && o.status!=="cancelled")
+        .map(o=>o.couponUid)
+  );
   MY_ORDERS = list.map(o=>{
     const d = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null;
     return {
@@ -1194,10 +1199,12 @@ async function saveProfile(){
 }
 /* ══ 優惠券 ══ */
 let MY_CP = [];
+let HELD_COUPONS = new Set();
 let cpTab = "ok";
 const todayISO = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 function cpUsable(c){
   if(c.used) return false;
+  if(HELD_COUPONS.has(c.docId)) return false;   /* 已被未完成訂單佔用 */
   if(c.expire < todayISO()) return false;
   if(MY_CH && c.channels && !c.channels.includes(MY_CH)) return false;
   return true;
@@ -1240,7 +1247,7 @@ function renderCoupons(){
         <div class="nm">${c.name}</div>
         <div class="cond">${c.minSpend? "單筆滿 "+money(c.minSpend)+" 可用":"無低消門檻"}<br>${chn} 適用</div>
         <div class="exp">${c.expire.replace(/-/g,"/")} 到期</div>
-        ${cpTab==="used"? `<div class="stamp">已使用</div>` : cpTab==="exp"? `<div class="stamp">已過期</div>`:""}
+        ${cpTab==="used"? `<div class="stamp">已使用</div>` : cpTab==="exp"? `<div class="stamp">已過期</div>` : HELD_COUPONS.has(c.docId)? `<div class="stamp" style="border-color:var(--gold);color:var(--gold);">使用中</div>`:""}
       </div>
     </div>`;
   }).join("") : `<div class="empty">目前沒有${cpTab==="ok"?"可用的":cpTab==="used"?"已使用的":"過期的"}優惠券。</div>`;
@@ -1469,7 +1476,7 @@ const badge = document.getElementById("mode-badge");
 if(cfg.apiKey && cfg.projectId){
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc, where, updateDoc, setDoc } =
+    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc, where, updateDoc, setDoc, limit } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
@@ -1565,7 +1572,7 @@ if(cfg.apiKey && cfg.projectId){
     // ── 會員狀態 ──
     window.fbLoadOrders = async (uid)=>{
       try{
-        const snap = await getDocs(query(collection(db,"orders"), where("uid","==",uid)));
+        const snap = await getDocs(query(collection(db,"orders"), where("uid","==",uid), limit(100)));
         const arr = snap.docs.map(x=>({docId:x.id, ...x.data()}));
         arr.sort((a,b)=>{
           const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
@@ -1577,7 +1584,7 @@ if(cfg.apiKey && cfg.projectId){
     };
     window.fbLoadCoupons = async (uid)=>{
       try{
-        const snap = await getDocs(query(collection(db,"usercoupons"), where("uid","==",uid)));
+        const snap = await getDocs(query(collection(db,"usercoupons"), where("uid","==",uid), limit(100)));
         return snap.docs.map(x=>({docId:x.id, ...x.data()}))
           .sort((a,b)=> String(a.expire||"").localeCompare(String(b.expire||"")));
       }catch(e){ console.error("讀取優惠券失敗", e); return []; }
