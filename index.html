@@ -871,8 +871,8 @@ let payway = "card";
 const PAY_SETS = {
   delivery:{opts:[["card","信用卡"],["linepay","LINE Pay"]], def:"card",
     hint:"皆透過藍新金流線上付款，付款成功自動確認"},
-  pickup:{opts:[["linepay","LINE Pay"],["cash","現金（取貨時付款）"]], def:"linepay",
-    hint:"LINE Pay 走藍新線上付款、自動確認；現金請於取貨時支付"}
+  pickup:{opts:[["card","信用卡"],["linepay","LINE Pay"],["cash","現金（取貨時付款）"]], def:"cash",
+    hint:"信用卡／LINE Pay 走藍新線上付款、自動確認；現金請於取貨時支付"}
 };
 const PAY_DISABLED = () => chOnlinePay()? [] : ["card","linepay"];
 function renderPayOpts(){
