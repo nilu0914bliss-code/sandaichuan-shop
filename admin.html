@@ -13,6 +13,24 @@
   header{background:var(--wine);color:var(--cream);padding:14px 16px;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;}
   header .t{font-size:16px;font-weight:700;letter-spacing:3px;font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;flex:1;}
   header button{border:1px solid var(--cream);background:none;color:var(--cream);border-radius:3px;font-size:12px;padding:5px 12px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+  .scard{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+  .scard-h{display:flex;align-items:center;gap:10px;padding:14px;cursor:pointer;user-select:none;}
+  .scard-h .ic{font-style:normal;font-size:16px;width:22px;text-align:center;}
+  .scard-h .t{flex:1;font-size:14.5px;font-weight:700;letter-spacing:1px;}
+  .scard-h .sbadge{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EFE7E4;color:var(--ink-soft);}
+  .scard-h .sbadge.on{background:#E7F0E2;color:#5A7A48;}
+  .scard-h .arr{color:var(--ink-soft);font-size:11px;transition:transform .2s;}
+  .scard.open .arr{transform:rotate(180deg);}
+  .scard-b{display:none;padding:0 14px 14px;border-top:1px solid var(--cream-soft);}
+  .scard.open .scard-b{display:block;}
+  .scard-b .inner{padding-top:12px;}
+  .sw-row{display:flex;align-items:center;gap:10px;}
+  .sw-row .l{flex:1;font-size:14px;font-weight:700;}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .fld{margin-bottom:11px;}
+  .fld label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;}
+  .fld input,.fld select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink);}
+  .tprev{background:var(--cream-soft);border-radius:8px;padding:11px 13px;margin-top:10px;font-size:12px;color:var(--wine);line-height:1.9;}
   .cp-fld{margin-bottom:11px;}
   .cp-fld label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;}
   .cp-fld input,.cp-fld select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;
@@ -233,86 +251,139 @@
     <div class="m-wrap">
       <div class="ch-note" id="set-note"></div>
 
-      <div class="mi">
-        <div class="mi-h"><span class="nm" id="lb-open-name">開放接單</span><span class="sw-lb" id="lb-open"></span>
-          <button class="switch" id="sw-open"></button></div>
-        <div class="hint" id="hint-open"></div>
+      <!-- 開放接單 -->
+      <div class="scard open" id="sc-open">
+        <div class="scard-h" onclick="toggleCard('sc-open',event)">
+          <i class="ic">🟢</i><span class="t" id="lb-open-name">開放接單</span>
+          <span class="sbadge" id="badge-open"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="sw-row"><span class="l" id="lb-open-l">開放自取</span><button class="switch" id="sw-open"></button></div>
+          <div class="hint" id="hint-open"></div>
+        </div></div>
       </div>
 
-      <div class="mi">
-        <div class="mi-h"><span class="nm">首頁公告</span><span class="sw-lb" id="lb-ann"></span>
-          <button class="switch" id="sw-ann"></button></div>
-        <textarea id="ann-input" rows="3" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:4px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;" placeholder="例：本週六提早收攤"></textarea>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
-          <div class="ph-box" style="width:88px;height:66px;" onclick="pickAnnPhoto()">
-            <img id="ann-thumb" style="display:none;" alt="">
-            <span id="ann-plus">+<br>公告圖片</span>
+      <!-- 取餐時段 -->
+      <div class="scard open" id="sc-time">
+        <div class="scard-h" onclick="toggleCard('sc-time',event)">
+          <i class="ic">🕐</i><span class="t">取餐時段</span>
+          <span class="sbadge" id="badge-time"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="g2">
+            <div class="fld"><label>開始取餐</label><input type="time" id="t-start" onchange="onTimeChange()"></div>
+            <div class="fld"><label>結束取餐</label><input type="time" id="t-end" onchange="onTimeChange()"></div>
           </div>
-          <div style="flex:1;">
-            <div class="hint" style="margin:0;">選填。只會顯示給選了這個取貨點的客人</div>
-            <button class="btn" id="ann-rm" style="display:none;margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="removeAnnPhoto()">移除圖片</button>
+          <div class="fld"><label>時段間隔（分鐘）</label><input type="number" id="t-gap" min="5" step="5" onchange="onTimeChange()"></div>
+          <div class="hint">客人端會照這個產生取餐時段，今天已過的時段自動隱藏。</div>
+          <div class="tprev" id="t-preview"></div>
+        </div></div>
+      </div>
+
+      <!-- 公休日（預設收起） -->
+      <div class="scard" id="sc-off">
+        <div class="scard-h" onclick="toggleCard('sc-off',event)">
+          <i class="ic">📅</i><span class="t">公休日</span>
+          <span class="sbadge" id="badge-off"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner" id="off-block">
+          <div class="hint" style="margin:0 0 8px;">點日期設為公休，再點取消。公休日客人端無法選為取貨日。</div>
+          <div id="cal-wrap"></div>
+          <div class="legend">
+            <span class="lg"><i class="a"></i>公休</span>
+            <span class="lg"><i class="b"></i>今天</span>
           </div>
-        </div>
+          <div class="sum-box"><div class="sum-t">目 前 設 定</div><div class="sum-l" id="off-sum">尚未設定公休日</div></div>
+        </div></div>
       </div>
 
-      <div class="mi" id="off-block">
-        <div class="mi-h" style="margin-bottom:8px;"><span class="nm">公休日</span></div>
-        <div class="hint" style="margin:0 0 6px;">點一下日期設為公休，再點一下取消。設為公休的日子，客人端無法選為取貨日。</div>
-        <div id="cal-wrap"></div>
-        <div class="legend">
-          <span class="lg"><i class="a"></i>公休</span>
-          <span class="lg"><i class="b"></i>今天</span>
+      <!-- 首頁公告（預設收起） -->
+      <div class="scard" id="sc-ann">
+        <div class="scard-h" onclick="toggleCard('sc-ann',event)">
+          <i class="ic">📢</i><span class="t">首頁公告</span>
+          <span class="sbadge" id="badge-ann"></span><span class="arr">▾</span>
         </div>
-        <div class="sum-box">
-          <div class="sum-t">目 前 設 定</div>
-          <div class="sum-l" id="off-sum">尚未設定公休日</div>
-        </div>
-      </div>
-
-      <div class="mi">
-        <div class="mi-h" style="margin-bottom:10px;"><span class="nm">優惠券</span></div>
-        <div class="hint" id="cp-scope" style="margin:0 0 10px;"></div>
-
-        <div class="cp-fld"><label>券名稱</label><input id="cp-name" placeholder="例：八月會員日 50 元折價券"></div>
-
-        <div class="cp-fld"><label>折扣方式</label>
-          <div class="seg">
-            <button class="seg-b on" id="cp-t-amount" onclick="setCpType('amount')">折抵金額</button>
-            <button class="seg-b" id="cp-t-percent" onclick="setCpType('percent')">打折</button>
+        <div class="scard-b"><div class="inner">
+          <div class="sw-row"><span class="l">顯示公告</span><button class="switch" id="sw-ann"></button></div>
+          <textarea id="ann-input" rows="3" style="width:100%;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;" placeholder="例：本週六提早收攤"></textarea>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+            <div class="ph-box" style="width:88px;height:66px;" onclick="pickAnnPhoto()">
+              <img id="ann-thumb" style="display:none;" alt=""><span id="ann-plus">+<br>公告圖片</span>
+            </div>
+            <div style="flex:1;">
+              <div class="hint" style="margin:0;">選填。只顯示給選這個取貨點的客人</div>
+              <button class="btn" id="ann-rm" style="display:none;margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="removeAnnPhoto()">移除圖片</button>
+            </div>
           </div>
-        </div>
-
-        <div style="display:flex;gap:8px;">
-          <div class="cp-fld" style="flex:1;"><label id="cp-vlabel">折抵金額</label>
-            <input type="number" id="cp-value" min="1" value="50"></div>
-          <div class="cp-fld" style="flex:1;"><label>最低消費</label>
-            <input type="number" id="cp-min" min="0" value="0"></div>
-        </div>
-
-        <div class="cp-fld"><label>有效期限</label><input type="date" id="cp-exp"></div>
-
-
-        <div class="cp-fld"><label>發送對象</label>
-          <select id="cp-target" onchange="countTargets()">
-            <option value="all">全部會員</option>
-            <option value="lv1">滷林高手以上</option>
-            <option value="lv2">滷味宗師以上</option>
-            <option value="lv3">滷味霸主</option>
-            <option value="bday">本月壽星</option>
-          </select>
-          <div class="hint" id="cp-count">計算中…</div>
-        </div>
-
-        <button class="btn btn-full" id="cp-send" onclick="sendCoupon()">發 送 優 惠 券</button>
-
-        <div class="cat-title" style="margin-top:18px;">已 發 送 紀 錄</div>
-        <div id="cp-list"><div class="hint">尚無紀錄</div></div>
+        </div></div>
       </div>
 
-      <div class="mi" style="background:var(--cream-soft);">
-        <div class="mi-h"><span class="nm">開放線上付款（信用卡／LINE Pay）</span><span class="sw-lb" id="lb-onlinePay"></span>
-          <button class="switch" id="sw-onlinePay"></button></div>
-        <div class="hint">此項為<b>全站共用</b>設定。金流部署完成前請保持關閉；關閉時客人只能選「現金（取貨時付款）」。</div>
+      <!-- 優惠券（預設收起） -->
+      <div class="scard" id="sc-cp">
+        <div class="scard-h" onclick="toggleCard('sc-cp',event)">
+          <i class="ic">🎟</i><span class="t">優惠券</span>
+          <span class="sbadge" id="badge-cp"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" id="cp-scope" style="margin:0 0 10px;"></div>
+
+          <div class="cp-fld"><label>券名稱</label><input id="cp-name" placeholder="例：八月會員日 50 元折價券"></div>
+
+          <div class="cp-fld"><label>優惠類型</label>
+            <div class="seg" style="flex-wrap:wrap;">
+              <button class="seg-b on" id="cp-t-amount" onclick="setCpType('amount')">折抵金額</button>
+              <button class="seg-b" id="cp-t-percent" onclick="setCpType('percent')">打折</button>
+              <button class="seg-b" id="cp-t-gift" onclick="setCpType('gift')">送品項</button>
+            </div>
+          </div>
+
+          <div id="cp-val-wrap">
+            <div style="display:flex;gap:8px;">
+              <div class="cp-fld" style="flex:1;"><label id="cp-vlabel">折抵金額</label>
+                <input type="number" id="cp-value" min="1" value="50"></div>
+              <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                <input type="number" id="cp-min" min="0" value="0" placeholder="0＝無門檻"></div>
+            </div>
+          </div>
+
+          <div id="cp-gift-wrap" style="display:none;">
+            <div class="cp-fld"><label>贈送品項</label>
+              <select id="cp-gift"></select>
+            </div>
+            <div class="cp-fld"><label>最低消費（0＝無門檻）</label>
+              <input type="number" id="cp-gmin" min="0" value="0"></div>
+          </div>
+
+          <div class="cp-fld"><label>有效期限</label><input type="date" id="cp-exp"></div>
+
+          <div class="cp-fld"><label>發送對象</label>
+            <select id="cp-target" onchange="countTargets()">
+              <option value="all">全部會員</option>
+              <option value="lv1">滷林高手以上</option>
+              <option value="lv2">滷味宗師以上</option>
+              <option value="lv3">滷味霸主</option>
+              <option value="bday">本月壽星</option>
+            </select>
+            <div class="hint" id="cp-count">計算中…</div>
+          </div>
+
+          <button class="btn btn-full" id="cp-send" onclick="sendCoupon()">發 送 優 惠 券</button>
+
+          <div class="cat-title" style="margin-top:18px;">已 發 送 紀 錄</div>
+          <div id="cp-list"><div class="hint">尚無紀錄</div></div>
+        </div></div>
+      </div>
+
+      <!-- 線上付款（各通路獨立） -->
+      <div class="scard" id="sc-pay">
+        <div class="scard-h" onclick="toggleCard('sc-pay',event)">
+          <i class="ic">💳</i><span class="t">線上付款</span>
+          <span class="sbadge" id="badge-pay"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="sw-row"><span class="l">信用卡 / LINE Pay</span><button class="switch" id="sw-onlinePay"></button></div>
+          <div class="hint">開啟後，此通路的客人可選線上付款。金流部署完成前請保持關閉。</div>
+        </div></div>
       </div>
 
       <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;">儲存設定</button>
@@ -384,8 +455,14 @@ function setView(v){
 let GLOBAL = { onlinePayOpen:false };
 let CHSET = {};   /* { fs:{open,annOn,annText,annImage,offDates}, sm:{...}, dl:{...} } */
 function curSet(){
-  if(!CHSET[EDIT_CH]) CHSET[EDIT_CH] = {open:true, annOn:false, annText:"", annImage:"", offDates:[]};
-  return CHSET[EDIT_CH];
+  if(!CHSET[EDIT_CH]) CHSET[EDIT_CH] = {open:true, annOn:false, annText:"", annImage:"", offDates:[],
+    onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20};
+  const s = CHSET[EDIT_CH];
+  if(s.tStart===undefined) s.tStart = "06:00";
+  if(s.tEnd===undefined) s.tEnd = "12:30";
+  if(s.tGap===undefined) s.tGap = 20;
+  if(s.onlinePay===undefined) s.onlinePay = false;
+  return s;
 }
 /* 為了沿用既有函式，SHOP 指向目前通路 */
 Object.defineProperty(window, "SHOP", { get: ()=>curSet() });
@@ -399,9 +476,26 @@ window.setCpType = t=>{
   CP_TYPE = t;
   $("cp-t-amount").classList.toggle("on", t==="amount");
   $("cp-t-percent").classList.toggle("on", t==="percent");
-  $("cp-vlabel").textContent = t==="amount"? "折抵金額" : "折數（例 9 = 九折）";
-  $("cp-value").value = t==="amount"? 50 : 9;
+  $("cp-t-gift").classList.toggle("on", t==="gift");
+  $("cp-val-wrap").style.display = t==="gift"? "none":"block";
+  $("cp-gift-wrap").style.display = t==="gift"? "block":"none";
+  if(t!=="gift"){
+    $("cp-vlabel").textContent = t==="amount"? "折抵金額" : "折數（例 9 = 九折）";
+    $("cp-value").value = t==="amount"? 50 : 9;
+  } else {
+    fillGiftOptions();
+  }
 };
+function fillGiftOptions(){
+  const sel = $("cp-gift"); if(!sel) return;
+  const opts = [];
+  PRODUCTS.forEach(p=>{
+    (p.vars||[]).forEach((v,vi)=>{
+      opts.push(`<option value="${p.docId}|${vi}">${p.n}${v.v? "（"+v.v+"）":""}</option>`);
+    });
+  });
+  sel.innerHTML = opts.join("") || `<option value="">目前沒有商品</option>`;
+}
 function renderCpCh(){
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   const el = $("cp-scope");
@@ -438,7 +532,7 @@ window.sendCoupon = async ()=>{
   const min = +($("cp-min").value || 0);
   const exp = $("cp-exp").value;
   if(!name){ alert("請填寫券名稱"); return; }
-  if(!val || val<=0){ alert("請填寫有效的折扣值"); return; }
+  if(CP_TYPE!=="gift" && (!val || val<=0)){ alert("請填寫有效的折扣值"); return; }
   if(CP_TYPE==="percent" && (val<1 || val>9.9)){ alert("折數請填 1～9.9（例：9 = 九折）"); return; }
   if(!exp){ alert("請選擇有效期限"); return; }
   const list = targetMembers();
@@ -448,16 +542,27 @@ window.sendCoupon = async ()=>{
   const btn = $("cp-send");
   btn.disabled = true; btn.textContent = "發送中…";
   try{
-    const cref = await addDoc(collection(db,"coupons"), {
-      name, type:CP_TYPE, value:val, minSpend:min, expire:exp,
-      channels:[EDIT_CH], target:$("cp-target").value,
-      issued:list.length, used:0, createdAt: serverTimestamp()
-    });
+    let giftName = "", giftKey = "";
+    let minSp = min;
+    if(CP_TYPE==="gift"){
+      giftKey = $("cp-gift").value;
+      minSp = +($("cp-gmin").value || 0);
+      if(!giftKey){ alert("請選擇贈送品項"); btn.disabled=false; countTargets(); return; }
+      const [pid, vi] = giftKey.split("|");
+      const p = PRODUCTS.find(x=>x.docId===pid);
+      giftName = p? (p.n + ((p.vars[+vi]&&p.vars[+vi].v)? "（"+p.vars[+vi].v+"）":"")) : "贈品";
+    }
+    const base = {
+      name, type:CP_TYPE, value: CP_TYPE==="gift"? 0 : val, minSpend: minSp, expire:exp,
+      giftKey, giftName, channels:[EDIT_CH]
+    };
+    const cref = await addDoc(collection(db,"coupons"), Object.assign({}, base, {
+      target:$("cp-target").value, issued:list.length, used:0, createdAt: serverTimestamp()
+    }));
     for(const m of list){
-      await setDoc(doc(db,"usercoupons", m.uid + "_" + cref.id), {
-        uid:m.uid, cid:cref.id, name, type:CP_TYPE, value:val, minSpend:min,
-        expire:exp, channels:[EDIT_CH], used:false, createdAt: serverTimestamp()
-      });
+      await setDoc(doc(db,"usercoupons", m.uid + "_" + cref.id), Object.assign({}, base, {
+        uid:m.uid, cid:cref.id, used:false, createdAt: serverTimestamp()
+      }));
     }
     toast(`已發送 ${list.length} 張`);
     $("cp-name").value = "";
@@ -480,8 +585,8 @@ async function loadCoupons(){
       const expired = c.expire < today;
       return `<div class="cp-row" style="${expired?"opacity:.55;":""}">
         <div class="n">${c.name}
-          <div class="s">${c.type==="amount"? "折抵 "+c.value+" 元" : c.value+" 折"}
-            ${c.minSpend? "・滿 "+c.minSpend:""}<br>${c.expire.replace(/-/g,"/")} 到期${expired?"（已過期）":""}<br>${chn}</div>
+          <div class="s">${c.type==="amount"? "折抵 "+c.value+" 元" : c.type==="percent"? c.value+" 折" : "送 "+(c.giftName||"品項")}
+            ${c.minSpend? "・滿 "+c.minSpend:""}<br>${c.expire.replace(/-/g,"/")} 到期${expired?"（已過期）":""}</div>
         </div>
         <div class="c">${c.issued||0} 張<br><span style="font-weight:400;color:var(--ink-soft);">已用 ${c.used||0}</span></div>
       </div>`;
@@ -539,32 +644,85 @@ window.toggleOff = key=>{
   renderOff();
 };
 
+function pad2(n){ return String(n).padStart(2,"0"); }
+function genSlots(start, end, gap){
+  const [sh,sm] = (start||"06:00").split(":").map(Number);
+  const [eh,em] = (end||"12:30").split(":").map(Number);
+  const s = sh*60+sm, e = eh*60+em, g = Math.max(5, +gap||20);
+  const out = [];
+  for(let t=s; t+g<=e; t+=g) out.push(pad2(Math.floor(t/60))+":"+pad2(t%60)+"–"+pad2(Math.floor((t+g)/60))+":"+pad2((t+g)%60));
+  return out;
+}
+window.onTimeChange = ()=>{
+  const s = curSet();
+  s.tStart = $("t-start").value || "06:00";
+  s.tEnd = $("t-end").value || "12:30";
+  s.tGap = +$("t-gap").value || 20;
+  renderTimePreview();
+};
+function renderTimePreview(){
+  const s = curSet();
+  const slots = genSlots(s.tStart, s.tEnd, s.tGap);
+  const el = $("t-preview");
+  if(el) el.innerHTML = slots.length
+    ? `產生 <b>${slots.length}</b> 個時段：${slots.slice(0,3).join("　")}${slots.length>3? "　…　"+slots[slots.length-1]:""}`
+    : "時間設定有誤，請檢查開始需早於結束。";
+  const b = $("badge-time");
+  if(b) b.textContent = (s.tStart||"6:00").replace(/^0/,"")+"–"+(s.tEnd||"12:30").replace(/^0/,"");
+}
 function renderSettings(){
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   const s = curSet();
   const note = $("set-note");
-  if(note) note.innerHTML = `目前設定：<b style="color:var(--wine);">${cur.n}</b>　公告與公休日只影響這個取貨點。`;
+  if(note) note.innerHTML = `目前通路：<b style="color:var(--wine);">${cur.n}</b>　所有設定只影響這個通路。`;
 
-  $("lb-open-name").textContent = cur.type==="pickup" ? `開放「${cur.n}」自取` : "開放冷凍宅配";
+  // 開放接單
+  $("lb-open-name").textContent = "開放接單";
+  $("lb-open-l").textContent = cur.type==="pickup" ? `開放「${cur.n}」自取` : "開放冷凍宅配";
   $("hint-open").textContent = cur.type==="pickup"
     ? "關閉後，客人端選不到這個取貨點。"
-    : "宅配需要線上付款；線上付款未開放時，客人端的宅配會顯示「尚未開放」。";
+    : "宅配需要線上付款；線上付款關閉時，客人端宅配會顯示「尚未開放」。";
   $("sw-open").classList.toggle("on", s.open !== false);
-  $("lb-open").textContent = (s.open !== false)? "開放中":"已關閉";
+  const bo = $("badge-open");
+  bo.textContent = (s.open!==false)? "開放中":"已關閉";
+  bo.classList.toggle("on", s.open!==false);
 
+  // 取餐時段（宅配不需要）
+  const tcard = $("sc-time");
+  if(tcard) tcard.style.display = cur.type==="pickup" ? "block":"none";
+  $("t-start").value = s.tStart || "06:00";
+  $("t-end").value = s.tEnd || "12:30";
+  $("t-gap").value = s.tGap || 20;
+  renderTimePreview();
+
+  // 公休日
+  const ocard = $("sc-off");
+  if(ocard) ocard.style.display = cur.type==="pickup" ? "block":"none";
+  const boff = $("badge-off");
+  if(boff){ const n=(s.offDates||[]).filter(d=>d>=todayStr()).length; boff.textContent = n? n+" 天":"未設定"; }
+
+  // 公告
   $("sw-ann").classList.toggle("on", !!s.annOn);
-  $("lb-ann").textContent = s.annOn? "顯示中":"已隱藏";
+  const ba = $("badge-ann");
+  ba.textContent = s.annOn? "顯示中":"已隱藏";
+  ba.classList.toggle("on", !!s.annOn);
   $("ann-input").value = s.annText || "";
 
-  $("sw-onlinePay").classList.toggle("on", !!GLOBAL.onlinePayOpen);
-  $("lb-onlinePay").textContent = GLOBAL.onlinePayOpen? "開放中":"已關閉";
+  // 線上付款（各通路）
+  $("sw-onlinePay").classList.toggle("on", !!s.onlinePay);
+  const bp = $("badge-pay");
+  bp.textContent = s.onlinePay? "開放中":"已關閉";
+  bp.classList.toggle("on", !!s.onlinePay);
 
-  const ob = $("off-block");
-  if(ob) ob.style.display = cur.type==="pickup" ? "block":"none";
+  renderCpCh();
 }
 $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
-$("sw-onlinePay").onclick = ()=>{ GLOBAL.onlinePayOpen = !GLOBAL.onlinePayOpen; renderSettings(); };
+$("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
+window.toggleCard = (id, e)=>{
+  if(e && e.target && e.target.classList.contains("switch")) return;
+  const c = $(id); if(c) c.classList.toggle("open");
+};
 
 window.toggleOff = key=>{
   SHOP.offDates = SHOP.offDates || [];
@@ -579,8 +737,9 @@ async function loadSettings(){
     if(g.exists()) GLOBAL = Object.assign(GLOBAL, g.data());
     for(const c of CH){
       const s = await getDoc(doc(db,"settings","ch_"+c.k));
-      CHSET[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[]},
-                                 s.exists()? s.data() : {});
+      CHSET[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[],
+        onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20},
+        s.exists()? s.data() : {});
     }
   }catch(e){ console.error("讀取設定失敗", e); }
   renderSettings(); renderOff(); renderAnnPhoto();
@@ -590,9 +749,11 @@ $("btn-save-set").onclick = async ()=>{
   s.annText = $("ann-input").value.trim();
   s.annImage = s.annImage || "";
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  s.tStart = $("t-start").value || "06:00";
+  s.tEnd = $("t-end").value || "12:30";
+  s.tGap = +$("t-gap").value || 20;
   try{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
-    await setDoc(doc(db,"settings","global"), GLOBAL, {merge:true});
     toast("已儲存（" + cur.n + "）");
   }catch(e){
     console.error("儲存設定失敗", e);
@@ -936,6 +1097,7 @@ function renderOrders(){
           ${(o.items||[]).map(x=>`<div class="r"><span>${x.name} × ${x.qty}</span><span>${money(x.price*x.qty)}</span></div>`).join("")}
           <div class="r"><span>運費</span><span>${isPk?"自取免運":(o.shipFee? money(o.shipFee):"免運")}</span></div>
           ${o.couponDiscount? `<div class="r"><span>優惠券（${o.couponName||""}）</span><span>- ${money(o.couponDiscount)}</span></div>`:""}
+          ${o.couponGift? `<div class="r"><span>優惠券贈品</span><span>🎁 ${o.couponGift} ×1</span></div>`:""}
           ${o.pointsUsed? `<div class="r"><span>點數折抵</span><span>- ${money(o.pointsUsed)}</span></div>`:""}
           <div class="r tt"><span>合計${o.payMethod==="cash"?"（現金應收）":""}</span><span>${money(o.total)}</span></div>
           ${o.pointsEarn? `<div class="r" style="font-size:12px;color:var(--ink-soft);"><span>回饋點數</span><span>${o.pointsEarn} 點${o.pointsSettled?"（已入帳）":"（完成後入帳）"}</span></div>`:""}

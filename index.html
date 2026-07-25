@@ -21,7 +21,6 @@
     font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
     background:var(--paper); color:var(--ink);
     max-width:480px; margin:0 auto; min-height:100vh;
-    border-left:1px solid var(--line); border-right:1px solid var(--line);
   }
   header{background:var(--wine);color:var(--cream);padding:22px 16px 18px;position:sticky;top:0;z-index:20;text-align:center;}
   header.logo-head{padding:10px 0 8px;}
@@ -69,9 +68,9 @@
     font-size:13px;line-height:1.8;color:var(--ink);}
   .info-card b{letter-spacing:2px;}
 
-  .cartbar{position:fixed;bottom:58px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
-    background:var(--wine-deep);color:var(--cream);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:30;
-    border-top:2px solid var(--cream);}
+  .cartbar{position:fixed;bottom:56px;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+    background:rgba(89,27,27,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    color:var(--cream);padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:30;}
   .cartbar .sum{flex:1;}
   .cartbar .sum .n{font-size:12px;opacity:.85;letter-spacing:1px;}
   .cartbar .sum .t{font-size:19px;font-weight:800;}
@@ -531,14 +530,15 @@ const CH = [
 let MY_CH = "";
 try{ MY_CH = localStorage.getItem("sdc_ch") || ""; }catch(e){}
 const curCh = () => CH.find(c=>c.k===MY_CH) || null;
-function chSet(k){ return (SETTINGS.ch && SETTINGS.ch[k]) || {open:true, annOn:false, annText:"", annImage:"", offDates:[]}; }
+function chSet(k){ return (SETTINGS.ch && SETTINGS.ch[k]) || {open:true, annOn:false, annText:"", annImage:"", offDates:[], onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20}; }
 function chOpen(k){
   const s = chSet(k);
   if(s.open === false) return false;
   const c = CH.find(x=>x.k===k);
-  if(c && c.type==="delivery" && !SETTINGS.onlinePayOpen) return false;
+  if(c && c.type==="delivery" && !s.onlinePay) return false;
   return true;
 }
+function chOnlinePay(){ return MY_CH? !!chSet(MY_CH).onlinePay : false; }
 
 const SHIP_FEE = 160, FREE_AT = 1000; /* 運費規則為暫定假設，待店家確認 */
 let RAW_PRODUCTS = [];
@@ -693,6 +693,7 @@ function isClosed(d){
   return (s.offDates||[]).includes(isoLocal(d));
 }
 const deliveryAvailable = () => chOpen("dl");
+const onlinePayOn = () => chOnlinePay();
 function renderChList(){
   const el = $("ch-list"); if(!el) return;
   el.innerHTML = CH.map(c=>{
@@ -789,7 +790,7 @@ function setShipMethod(m){
 let cpSel = null;   /* 選用的優惠券 docId */
 function usableCoupons(){
   const sub = totals().sub;
-  return MY_CP.filter(c=>cpUsable(c) && cpDiscount(c, sub) > 0);
+  return MY_CP.filter(c=>cpUsable(c) && (cpDiscount(c, sub) > 0 || cpGiftOk(c, sub)));
 }
 function bestCoupon(){
   const sub = totals().sub;
@@ -819,7 +820,7 @@ function renderCpBox(){
   $("cp-options").innerHTML = list.map(c=>`
     <div class="cp-pick ${cpSel===c.docId?"on":""}" onclick="selCoupon('${c.docId}')" style="margin-bottom:8px;">
       <div class="l">
-        <div class="t">${c.name}　−${money(cpDiscount(c, sub))}</div>
+        <div class="t">${c.name}　${cpIsGift(c)? "🎁 送 "+(c.giftName||"品項") : "−"+money(cpDiscount(c, sub))}</div>
         <div class="d">${c.minSpend? "滿 "+money(c.minSpend)+" 可用・":""}${c.expire.replace(/-/g,"/")} 到期</div>
       </div>
       <span class="go">${cpSel===c.docId? "已選用 ✓":"選用 ›"}</span>
@@ -861,6 +862,7 @@ function updateCkSummary(){
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
     <div class="row"><span>運費</span><span>${shipMethod==="pickup"?"自取免運":(ship===0?"免運":money(ship))}</span></div>
     ${cpv? `<div class="row" style="color:var(--gold);"><span>優惠券</span><span>- ${money(cpv)}</span></div>`:""}
+    ${(()=>{ const c=curCoupon(); return cpGiftOk(c, t.sub)? `<div class="row" style="color:var(--gold);"><span>優惠券贈品</span><span>🎁 ${c.giftName||"品項"} ×1</span></div>`:""; })()}
     ${use? `<div class="row" style="color:var(--gold);"><span>點數折抵</span><span>- ${money(use)}</span></div>`:""}
     <div class="row total"><span>應付</span><span>${money(gross-use-cpv)}</span></div>
     ${member? `<div class="row" style="font-size:12px;color:var(--ink-soft);"><span>本單可得點數</span><span>${earn} 點</span></div>`:""}`;
@@ -872,7 +874,7 @@ const PAY_SETS = {
   pickup:{opts:[["linepay","LINE Pay"],["cash","現金（取貨時付款）"]], def:"linepay",
     hint:"LINE Pay 走藍新線上付款、自動確認；現金請於取貨時支付"}
 };
-const PAY_DISABLED = () => SETTINGS.onlinePayOpen? [] : ["card","linepay"];
+const PAY_DISABLED = () => chOnlinePay()? [] : ["card","linepay"];
 function renderPayOpts(){
   const s = PAY_SETS[shipMethod];
   if(!s.opts.some(o=>o[0]===payway)) payway = s.def;
@@ -882,7 +884,7 @@ function renderPayOpts(){
     const d = dis.includes(o[0]);
     return `<label class="${d?"dim":""}"><input type="radio" name="payway" value="${o[0]}" ${payway===o[0]?"checked":""} ${d?"disabled":""} onchange="payway=this.value;syncPayBtn()"> ${o[1]}${d?'<span class="soon">尚未開放</span>':""}</label>`;
   }).join("");
-  $("pay-hint").textContent = SETTINGS.onlinePayOpen? s.hint : "目前開放現金取貨付款；線上付款即將開放";
+  $("pay-hint").textContent = chOnlinePay()? s.hint : "目前開放現金取貨付款；線上付款即將開放";
   syncPayBtn();
 }
 function syncPayBtn(){ $("pay-btn").textContent = payway==="cash"? "送出訂單":"前往付款"; }
@@ -916,6 +918,7 @@ async function pay(){
   const gross = tt.sub + shipFee;
   const cpApplied = member? Math.min(cpValue(), gross) : 0;
   const cpDoc = curCoupon();
+  const giftOn = cpGiftOk(cpDoc, tt.sub);
   const ptApplied = (member && !cpApplied)? Math.min(ptUse, gross) : 0;
   const grand = gross - ptApplied - cpApplied;
   const myLv = member? levelOf(member.spent) : LEVELS[0];
@@ -930,11 +933,13 @@ async function pay(){
     status: payway==="cash" ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
     sauce:sauceSel, note:$("f-note").value.trim(),
-    items, subtotal:tt.sub, shipFee,
+    items: giftOn? [...items, {name:"🎁 "+(cpDoc.giftName||"贈品")+"（優惠券贈品）", qty:1, price:0}] : items,
+    subtotal:tt.sub, shipFee,
     pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
     couponUid: cpDoc? cpDoc.docId : null,
     couponName: cpDoc? cpDoc.name : "",
     couponDiscount: cpApplied,
+    couponGift: giftOn? (cpDoc.giftName||"贈品") : "",
     total: grand
   };
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
@@ -960,7 +965,7 @@ async function pay(){
   if(member && typeof refreshMyOrders === "function"){
     refreshMyOrders().catch(e=>console.error(e));
   }
-  if(payway !== "cash" && savedDocId && SETTINGS.onlinePayOpen){
+  if(payway !== "cash" && savedDocId && chOnlinePay()){
     try{
       const r = await fetch(FN + "/createPayment", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -985,7 +990,8 @@ async function pay(){
     const el = $("done-points");
     if(el){
       el.style.display = "block";
-      el.innerHTML = (cpApplied? `已使用優惠券折抵 <b>${money(cpApplied)}</b><br>`:"") +
+      el.innerHTML = (giftOn? `優惠券贈品：<b>${cpDoc.giftName||"品項"}</b> ×1<br>`:"") +
+        (cpApplied? `已使用優惠券折抵 <b>${money(cpApplied)}</b><br>`:"") +
         (ptApplied? `本單折抵 <b>${ptApplied}</b> 點<br>`:"") +
         `完成取貨後可獲得 <b>${ptEarn}</b> 點`;
     }
@@ -1203,9 +1209,13 @@ function cpFace(c){
 }
 function cpDiscount(c, sub){
   if(c.minSpend && sub < c.minSpend) return 0;
+  if(c.type==="gift") return 0;               /* 送品項不折現金 */
   if(c.type==="amount") return Math.min(c.value, sub);
-  return Math.floor(sub * (10 - c.value) / 10);
+  if(c.type==="percent") return Math.floor(sub * (10 - c.value) / 10);
+  return 0;
 }
+function cpIsGift(c){ return c && c.type==="gift"; }
+function cpGiftOk(c, sub){ return cpIsGift(c) && (!c.minSpend || sub >= c.minSpend); }
 async function refreshCoupons(){
   if(!member || !window.fbLoadCoupons){ MY_CP = []; return; }
   MY_CP = await window.fbLoadCoupons(member.uid);
@@ -1373,15 +1383,20 @@ function openOrder(i){
 function reset(){ cart={}; sauceSel=""; renderMenu(); renderBar(); renderCart(); go("p-menu"); }
 
 /* ══ 自取日期與時段（依現在時間自動排除已過時段） ══ */
-const SLOT_START = 360, SLOT_END = 750, SLOT_GAP = 20; /* 6:00–12:30，每 20 分鐘 */
-const LEAD_MIN = 120; /* 備貨提前時間（分鐘），之後可移到後台設定 */
+function chTime(){
+  const s = MY_CH? chSet(MY_CH) : {};
+  const [sh,sm] = (s.tStart||"06:00").split(":").map(Number);
+  const [eh,em] = (s.tEnd||"12:30").split(":").map(Number);
+  return { start: sh*60+sm, end: eh*60+em, gap: Math.max(5, s.tGap||20) };
+}
 const isoLocal = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 const hhmm = x => Math.floor(x/60) + ":" + String(x%60).padStart(2,"0");
 function slotsLeftToday(){
   const now = new Date();
-  const cut = now.getHours()*60 + now.getMinutes() + LEAD_MIN;
+  const cut = now.getHours()*60 + now.getMinutes();
+  const {start, end, gap} = chTime();
   const out = [];
-  for(let t=SLOT_START; t+SLOT_GAP<=SLOT_END; t+=SLOT_GAP){ if(t >= cut) out.push(t); }
+  for(let t=start; t+gap<=end; t+=gap){ if(t > cut) out.push(t); }
   return out;
 }
 function firstAvailableDate(){
@@ -1394,12 +1409,13 @@ function renderSlots(){
   if(!dt || !sel) return;
   const chosen = sel.value;
   const isToday = dt.value === isoLocal(new Date());
+  const {start, end, gap} = chTime();
   const list = [];
-  for(let t=SLOT_START; t+SLOT_GAP<=SLOT_END; t+=SLOT_GAP) list.push(t);
+  for(let t=start; t+gap<=end; t+=gap) list.push(t);
   const avail = isToday? slotsLeftToday() : list;
   sel.innerHTML = '<option value="">請選擇</option>' +
-    avail.map(t=>`<option>${hhmm(t)}–${hhmm(t+SLOT_GAP)}</option>`).join("");
-  if(chosen && avail.some(t=>hhmm(t)+"–"+hhmm(t+SLOT_GAP)===chosen)) sel.value = chosen;
+    avail.map(t=>`<option>${hhmm(t)}–${hhmm(t+gap)}</option>`).join("");
+  if(chosen && avail.some(t=>hhmm(t)+"–"+hhmm(t+gap)===chosen)) sel.value = chosen;
   const warn = $("slot-warn");
   if(warn) warn.style.display = (isToday && !avail.length)? "block":"none";
 }
