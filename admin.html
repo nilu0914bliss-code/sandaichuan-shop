@@ -752,15 +752,15 @@ async function refetch(){
 }
 function startData(){
   if(started) return; started = true;
-  onSnapshot(collection(db,"orders"), snap=>{
-    onOrders(sortOrders(snap.docs.map(d=>({docId:d.id, ...d.data()}))));
+  onSnapshot(query(collection(db,"orders"), orderBy("createdAt","desc")), snap=>{
+    onOrders(snap.docs.map(d=>({docId:d.id, ...d.data()})));
   }, err=>{
-    console.error(err);
+    console.error("讀取訂單失敗", err);
     const who = (auth.currentUser && auth.currentUser.email) || "（未登入）";
     $("list").innerHTML = `<div class="empty">讀取訂單失敗<br>
-      <span style="font-size:12px;">${err.code||""}</span><br><br>
-      目前登入帳號<br><b style="color:var(--wine);font-size:13px;">${who}</b><br><br>
-      <span style="font-size:12px;">請確認此帳號有寫在 Firestore 規則的白名單中</span></div>`;
+      <span style="font-size:13px;color:#C8351F;">${err.code||""}</span><br>
+      <span style="font-size:11.5px;">${err.message||""}</span><br><br>
+      登入帳號<br><b style="color:var(--wine);font-size:13px;">${who}</b></div>`;
   });
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refetch(); });
   setInterval(()=>{ if(!document.hidden && openSet.size===0) refetch(); }, 5000);
@@ -890,42 +890,28 @@ window.pickupDone = async id=>{
 function renderOrders(){
   const tISO0 = todayStr();
   const MINE = ORDERS.filter(inMyShop);
-  $("st-todo").textContent = MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&(o.type!=="pickup"||(o.pickup&&o.pickup.date<=tISO0))).length;
-  $("st-wait").textContent = MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&o.type==="pickup"&&o.pickup&&o.pickup.date>tISO0).length;
+  const activeM = MINE.filter(o=>!isDone(o)&&!isCancelled(o));
+  $("st-todo").textContent = activeM.filter(o=>o.type==="pickup"&&o.pickup&&o.pickup.date===tISO0).length;
+  $("st-wait").textContent = activeM.filter(o=>!(o.type==="pickup"&&o.pickup&&o.pickup.date===tISO0)).length;
   const tISO = todayStr();
   $("st-today").textContent = MINE.filter(o=>o.createdAt && o.createdAt.toDate && o.createdAt.toDate().toISOString().slice(0,10)===tISO).length;
 
   const show = MINE.map(o=>({o})).filter(({o})=>{
     const t = todayStr();
     const active = !isDone(o) && !isCancelled(o);
-    const isTodayOrder = active && (
-      (o.type==="pickup" && o.pickup && o.pickup.date <= t) ||
-      (o.type!=="pickup")
-    );
-    const isPre = active && o.type==="pickup" && o.pickup && o.pickup.date > t;
+    // 今日待處理：自取且取貨日=今天。宅配一律進預購單（待出貨）。
+    const isTodayOrder = active && o.type==="pickup" && o.pickup && o.pickup.date === t;
+    // 預購單：今天以後的自取、還沒到的、以及所有宅配
+    const isPre = active && !isTodayOrder;
     const stOK = stF==="all" || (stF==="today"&&isTodayOrder) || (stF==="pre"&&isPre)
       || (stF==="done"&&isDone(o)) || (stF==="cancelled"&&isCancelled(o));
     return stOK;
   });
   if(!show.length){
-    const t2 = todayStr();
-    const cnt = {
-      today: MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&(o.type!=="pickup"||(o.pickup&&o.pickup.date<=t2))).length,
-      pre:   MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&o.type==="pickup"&&o.pickup&&o.pickup.date>t2).length,
-      done:  MINE.filter(isDone).length,
-      cancelled: MINE.filter(isCancelled).length
-    };
-    const NAME = {today:"今日待處理", pre:"預購單", done:"已結帳", cancelled:"已取消"};
-    const others = Object.keys(cnt).filter(k=>k!==stF && cnt[k]>0);
-    const otherCh = ORDERS.filter(o=>!inMyShop(o)).length;
-    $("list").innerHTML = `<div class="empty">
-      此分類目前沒有訂單。
-      ${others.length? `<br><br><span style="font-size:12.5px;">訂單在這些分類：${
-        others.map(k=>`<b style="color:var(--wine);">${NAME[k]} ${cnt[k]}</b>`).join("、")}</span>`:""}
-      ${otherCh? `<br><span style="font-size:12.5px;">其他通路還有 <b style="color:var(--wine);">${otherCh}</b> 張訂單，可按上方「切換」查看。</span>`:""}
-      ${(!MINE.length && !ORDERS.length)? `<br><br><span style="font-size:12px;color:var(--ink-soft);">資料庫目前讀到 0 筆訂單。</span>`:""}
-      <br><br><span style="font-size:11.5px;color:var(--ink-soft);">資料庫共 ${ORDERS.length} 筆・本通路 ${MINE.length} 筆</span>
-    </div>`;
+    const otherCh = ORDERS.filter(o=>!inMyShop(o) && !isDone(o) && !isCancelled(o)).length;
+    $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。${
+      otherCh? `<div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft);">其他通路有 ${otherCh} 張待處理，可按上方「切換」查看</div>`:""
+    }</div>`;
     return;
   }
   $("list").innerHTML = show.map(({o})=>{
