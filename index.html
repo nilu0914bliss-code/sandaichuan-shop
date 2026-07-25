@@ -901,6 +901,30 @@ function openCheckout(){
   go("p-checkout"); setShipMethod(shipMethod); renderCpBox(); renderPtBox();
 }
 async function pay(){
+  // ── 送出前檢查必填，缺哪個就提示並跳到該欄位 ──
+  const need = [];
+  if(!$("f-name").value.trim()) need.push(["f-name","請填寫姓名"]);
+  if(!$("f-phone").value.trim()) need.push(["f-phone","請填寫手機號碼"]);
+  if(shipMethod==="pickup"){
+    if(!$("f-pdate").value) need.push(["f-pdate","請選擇取貨日期"]);
+    if(!$("f-ptime").value) need.push(["f-ptime","請選擇取貨時段"]);
+  } else {
+    if(!$("f-city").value) need.push(["f-city","請選擇宅配縣市"]);
+    if(!$("f-store").value.trim()) need.push(["f-store","請填寫 7-11 門市名稱"]);
+  }
+  if(need.length){
+    const [fid, msg] = need[0];
+    alert(msg);
+    const el = $(fid);
+    if(el){
+      el.scrollIntoView({behavior:"smooth", block:"center"});
+      el.style.transition = "box-shadow .2s";
+      el.style.boxShadow = "0 0 0 3px rgba(200,53,31,.35)";
+      setTimeout(()=>{ el.style.boxShadow = ""; }, 1500);
+      try{ el.focus({preventScroll:true}); }catch(e){}
+    }
+    return;
+  }
   if(shipMethod==="pickup"){
     const em = $("f-email");
     if(em && em.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value)) em.value = "";
@@ -937,6 +961,7 @@ async function pay(){
     subtotal:tt.sub, shipFee,
     pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
     couponUid: cpDoc? cpDoc.docId : null,
+    couponCid: cpDoc? (cpDoc.cid || null) : null,
     couponName: cpDoc? cpDoc.name : "",
     couponDiscount: cpApplied,
     couponGift: giftOn? (cpDoc.giftName||"贈品") : "",
@@ -1210,6 +1235,11 @@ function cpUsable(c){
   return true;
 }
 function cpFace(c){
+  if(c.type==="gift"){
+    return c.giftPhoto
+      ? `<img src="${c.giftPhoto}" alt="" style="width:64px;height:64px;border-radius:8px;object-fit:cover;">`
+      : `<div class="v" style="font-size:32px;">🎁</div><div class="u">贈 品</div>`;
+  }
   return c.type==="amount"
     ? `<div class="v">${c.value}</div><div class="u">元</div>`
     : `<div class="v">${c.value}<span style="font-size:17px;">折</span></div><div class="u">全 單</div>`;
@@ -1245,7 +1275,7 @@ function renderCoupons(){
       <div class="amt">${cpFace(c)}</div>
       <div class="cbody">
         <div class="nm">${c.name}</div>
-        <div class="cond">${c.minSpend? "單筆滿 "+money(c.minSpend)+" 可用":"無低消門檻"}<br>${chn} 適用</div>
+        <div class="cond">${c.type==="gift"? "🎁 贈送 "+(c.giftName||"品項")+"<br>":""}${c.minSpend? "單筆滿 "+money(c.minSpend)+" 可用":"無低消門檻"}<br>${chn} 適用</div>
         <div class="exp">${c.expire.replace(/-/g,"/")} 到期</div>
         ${cpTab==="used"? `<div class="stamp">已使用</div>` : cpTab==="exp"? `<div class="stamp">已過期</div>` : HELD_COUPONS.has(c.docId)? `<div class="stamp" style="border-color:var(--gold);color:var(--gold);">使用中</div>`:""}
       </div>

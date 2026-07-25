@@ -550,10 +550,11 @@ window.sendCoupon = async ()=>{
       const [pid, vi] = giftKey.split("|");
       const p = PRODUCTS.find(x=>x.docId===pid);
       giftName = p? (p.n + ((p.vars[+vi]&&p.vars[+vi].v)? "（"+p.vars[+vi].v+"）":"")) : "贈品";
+      var giftPhoto = p? (p.photo||"") : "";
     }
     const base = {
       name, type:CP_TYPE, value: CP_TYPE==="gift"? 0 : val, minSpend: minSp, expire:exp,
-      giftKey, giftName, channels:[EDIT_CH]
+      giftKey, giftName, giftPhoto: (CP_TYPE==="gift"? (giftPhoto||"") : ""), channels:[EDIT_CH]
     };
     const cref = await addDoc(collection(db,"coupons"), Object.assign({}, base, {
       target:$("cp-target").value, issued:list.length, used:0, createdAt: serverTimestamp()
@@ -1003,19 +1004,35 @@ async function settlePoints(id){
       if(!oSnap.exists()) return;
       const o = oSnap.data();
       if(o.pointsSettled) return;
-      if(!o.uid){ tx.update(oRef, {pointsSettled:true}); return; }
-      const mRef = doc(db,"members",o.uid);
-      const mSnap = await tx.get(mRef);
-      const m = mSnap.exists()? mSnap.data() : {};
-      const pts = (m.points||0) - (o.pointsUsed||0) + (o.pointsEarn||0);
-      const spent = (m.spent||0) + (o.total||0);
-      tx.set(mRef, {points: Math.max(0, pts), spent}, {merge:true});
+
+      // ── 先做所有讀取 ──
+      let mSnap = null, cSnap = null;
+      const mRef = o.uid ? doc(db,"members",o.uid) : null;
+      const cRef = o.couponCid ? doc(db,"coupons",o.couponCid) : null;
+      if(mRef) mSnap = await tx.get(mRef);
+      if(cRef) cSnap = await tx.get(cRef);
+
+      // ── 再做所有寫入 ──
+      if(mRef){
+        const m = mSnap && mSnap.exists()? mSnap.data() : {};
+        const pts = (m.points||0) - (o.pointsUsed||0) + (o.pointsEarn||0);
+        const spent = (m.spent||0) + (o.total||0);
+        tx.set(mRef, {points: Math.max(0, pts), spent}, {merge:true});
+      }
       if(o.couponUid){
-        tx.set(doc(db,"usercoupons",o.couponUid), {used:true, usedAt: serverTimestamp(), orderNo:o.orderNo||""}, {merge:true});
+        tx.set(doc(db,"usercoupons",o.couponUid),
+          {used:true, usedAt: serverTimestamp(), orderNo:o.orderNo||""}, {merge:true});
+      }
+      if(cRef && cSnap && cSnap.exists()){
+        tx.update(cRef, {used: (cSnap.data().used||0) + 1});
       }
       tx.update(oRef, {pointsSettled:true, pointsSettledAt: serverTimestamp()});
     });
-  }catch(e){ console.error("點數結算失敗", e); toast("點數結算失敗"); }
+  }catch(e){
+    console.error("結算失敗", e);
+    alert("點數／優惠券結算失敗\n\n" + (e.code||"") + "\n" + (e.message||"") +
+          "\n\n訂單狀態已更新，但點數或券可能未正確結算，請截圖回報。");
+  }
 }
 window.shipOrder = async id=>{
   const inp = $("trk-"+id), v = inp.value.trim();
