@@ -931,12 +931,17 @@ async function pay(){
   }
   const d=new Date();
   const dayKey = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-  let seq = 0;
-  if(window.fbNextSeq){
-    try{ seq = await window.fbNextSeq(dayKey); }
-    catch(e){ console.error("取號失敗", e); seq = Math.floor(Math.random()*900)+100; }
-  } else { seq = Math.floor(Math.random()*900)+100; }
-  const no = String(d.getDate()).padStart(2,"0") + "-" + String(seq).padStart(3,"0");
+  const isCash = (payway === "cash");
+  // 現金單前端取號；線上付款不取號（付款成功後由雲端取號建單）
+  let no = "";
+  if(isCash){
+    let seq = 0;
+    if(window.fbNextSeq){
+      try{ seq = await window.fbNextSeq(dayKey); }
+      catch(e){ console.error("取號失敗", e); seq = Math.floor(Math.random()*900)+100; }
+    } else { seq = Math.floor(Math.random()*900)+100; }
+    no = String(d.getDate()).padStart(2,"0") + "-" + String(seq).padStart(3,"0");
+  }
   const tt = totals();
   const shipFee = shipMethod==="pickup"? 0 : tt.ship;
   const gross = tt.sub + shipFee;
@@ -953,8 +958,8 @@ async function pay(){
   });
   const order = {
     uid: (member && member.uid) || null,
-    orderNo:no, type:shipMethod, payMethod:payway,
-    status: payway==="cash" ? "confirmed_cash" : "pending_payment",
+    orderNo: no, type:shipMethod, payMethod:payway,
+    status: isCash ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
     sauce:sauceSel, note:$("f-note").value.trim(),
     items: giftOn? [...items, {name:"🎁 "+(cpDoc.giftName||"贈品")+"（優惠券贈品）", qty:1, price:0}] : items,
@@ -970,31 +975,26 @@ async function pay(){
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
   else { order.pickup = {market:$("f-pmarket").value, date:$("f-pdate").value, slot:$("f-ptime").value}; }
 
-  let saveNote = "", savedDocId = null;
-  if(window.fbSaveOrder){
-    const btn=$("pay-btn");
+  const btn=$("pay-btn");
+
+  // ── 線上付款：存暫存區 → 跳藍新（付款成功後雲端才建正式訂單）──
+  if(!isCash){
+    if(!chOnlinePay()){ alert("此取貨點目前未開放線上付款。"); return; }
+    if(!window.fbSavePending){ alert("尚未連線資料庫，無法付款。"); return; }
+    let pendingId = null;
     try{
-      btn.disabled=true; btn.textContent="訂單送出中…";
-      savedDocId = await window.fbSaveOrder(order);
+      btn.disabled=true; btn.textContent="前往付款中…";
+      pendingId = await window.fbSavePending(order);
     }catch(e){
-      console.error("訂單送出失敗", e);
-      alert("訂單送出失敗\n\n" + (e.code||"") + "\n" + (e.message||"") + "\n\n請把這段訊息回報給開發者。");
+      console.error("暫存訂單失敗", e);
+      alert("送出失敗\n\n" + (e.code||"") + "\n" + (e.message||""));
       btn.disabled=false; syncPayBtn();
       return;
     }
-    btn.disabled=false; syncPayBtn();
-  } else {
-    saveNote = `<br><span style="font-size:12px;color:var(--ink-soft);">（示範模式：尚未連線資料庫，此單未真正儲存）</span>`;
-  }
-
-  if(member && typeof refreshMyOrders === "function"){
-    refreshMyOrders().catch(e=>console.error(e));
-  }
-  if(payway !== "cash" && savedDocId && chOnlinePay()){
     try{
       const r = await fetch(FN + "/createPayment", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({docId: savedDocId})
+        body: JSON.stringify({pendingId})
       });
       const p = await r.json();
       if(p.gateway && p.TradeInfo){
@@ -1005,11 +1005,33 @@ async function pay(){
         document.body.appendChild(f); f.submit();
         return;
       }
-      alert("建立付款失敗，訂單已保留為待付款，可稍後於會員中心重試。");
+      alert("建立付款失敗，請稍後再試。\n" + (p.error||""));
+      btn.disabled=false; syncPayBtn();
     }catch(e){
       console.error(e);
-      alert("連線付款頁失敗，訂單已保留為待付款。");
+      alert("連線付款頁失敗，請稍後再試。");
+      btn.disabled=false; syncPayBtn();
     }
+    return;
+  }
+
+  // ── 現金單：直接建立正式訂單 ──
+  let savedDocId = null;
+  if(window.fbSaveOrder){
+    try{
+      btn.disabled=true; btn.textContent="訂單送出中…";
+      savedDocId = await window.fbSaveOrder(order);
+    }catch(e){
+      console.error("訂單送出失敗", e);
+      alert("訂單送出失敗\n\n" + (e.code||"") + "\n" + (e.message||"") + "\n\n請把這段訊息回報給開發者。");
+      btn.disabled=false; syncPayBtn();
+      return;
+    }
+    btn.disabled=false; syncPayBtn();
+  }
+
+  if(member && typeof refreshMyOrders === "function"){
+    refreshMyOrders().catch(e=>console.error(e));
   }
   if(member){
     const el = $("done-points");
@@ -1527,14 +1549,22 @@ if(cfg.apiKey && cfg.projectId){
       const ref = doc(db, "counters", dayKey);
       return await runTransaction(db, async tx=>{
         const s = await tx.get(ref);
-        const n = (s.exists()? (s.data().n || 0) : 0) + 1;
-        tx.set(ref, {n, day: dayKey}, {merge:true});
-        return n;
+        const seq = (s.exists()? (s.data().seq || 0) : 0) + 1;
+        tx.set(ref, {seq, day: dayKey}, {merge:true});
+        return seq;
       });
     };
+    // 現金單：直接建立正式訂單
     window.fbSaveOrder = async (o)=>{
       o.createdAt = serverTimestamp();
       const ref = await addDoc(collection(db,"orders"), o);
+      return ref.id;
+    };
+    // 線上付款：先存暫存區，付款成功後由雲端建立正式訂單並取號
+    window.fbSavePending = async (o)=>{
+      o.createdAt = serverTimestamp();
+      o.done = false;
+      const ref = await addDoc(collection(db,"pending_orders"), o);
       return ref.id;
     };
     const snap = await getDocs(query(collection(db,"products"), orderBy("catSort")));
