@@ -1630,7 +1630,7 @@ if(cfg.apiKey && cfg.projectId){
       history.replaceState({}, "", location.pathname);
       cart = {};   // 清空購物車
       if(paid === "1"){
-        setTimeout(()=>alert("付款成功！\n\n訂單已成立，可至「會員中心」查看訂單與取餐號碼。"), 400);
+        setTimeout(()=>alert("付款流程已完成，可至會員中心查看訂單狀態。"), 400);
       } else {
         setTimeout(()=>alert("付款未完成或已取消。\n\n如需訂購請重新下單；若已扣款請聯繫店家。"), 400);
       }
