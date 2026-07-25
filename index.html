@@ -705,14 +705,34 @@ function renderChList(){
   }).join("");
 }
 window.pickCh = k=>{
+  const prev = MY_CH;
   MY_CH = k;
   try{ localStorage.setItem("sdc_ch", k); }catch(e){}
-  cart = {};
   syncChBar();
   applyShopSettings(null);
-  renderCats(); renderMenu(); renderBar(); renderCart();
+  renderCats(); renderMenu();
+
+  /* 保留購物車：移除新通路沒有或售完的品項 */
+  const removed = [];
+  if(prev && prev !== k && Object.keys(cart).length){
+    Object.keys(cart).forEach(key=>{
+      const [id, vi] = key.split("|");
+      const it = findItem(id);
+      if(!it || it.sold || !it.vars[+vi]){
+        removed.push(it? it.n : "部分品項");
+        delete cart[key];
+      }
+    });
+  }
+  renderMenu(); renderBar(); renderCart();
   go("p-menu");
   window.scrollTo(0,0);
+  if(removed.length){
+    setTimeout(()=>alert("已切換取貨點。\n\n以下品項在此處無法訂購，已從購物車移除：\n" +
+      [...new Set(removed)].join("、") + "\n\n其餘品項的價格已更新為此處價格。"), 300);
+  } else if(prev && prev !== k && Object.keys(cart).length){
+    setTimeout(()=>alert("已切換取貨點，購物車保留，價格已更新為此處價格。"), 300);
+  }
 };
 function syncChBar(){
   const c = curCh();

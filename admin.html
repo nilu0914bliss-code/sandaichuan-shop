@@ -224,6 +224,7 @@
       <span class="sw-lb" id="snd-state" style="flex:1;">🔕 點畫面任一處即可開啟提示音</span>
       <button class="btn" style="background:#fff;border:1px solid var(--wine);color:var(--wine);padding:7px 14px;font-size:12.5px;" onclick="testBeep()">測試音效</button>
     </div>
+    <div id="other-alert" onclick="this.style.display='none'" style="display:none;margin:10px 16px 0;background:var(--cream-soft);border:1px solid #E4C98A;color:var(--gold);padding:10px 14px;border-radius:6px;font-size:12.5px;font-weight:700;line-height:1.6;cursor:pointer;"></div>
     <div id="new-alert" onclick="this.style.display='none'" style="display:none;margin:10px 16px 0;background:#C8351F;color:#fff;padding:11px 14px;border-radius:6px;font-size:13.5px;font-weight:700;line-height:1.6;cursor:pointer;">新訂單</div>
     <div class="list" id="list"><div class="empty">載入中…</div></div>
   </div>
@@ -270,7 +271,7 @@
 
       <div class="mi">
         <div class="mi-h" style="margin-bottom:10px;"><span class="nm">優惠券</span></div>
-        <div class="hint" style="margin:0 0 10px;">建立後發送給指定會員。優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。</div>
+        <div class="hint" id="cp-scope" style="margin:0 0 10px;"></div>
 
         <div class="cp-fld"><label>券名稱</label><input id="cp-name" placeholder="例：八月會員日 50 元折價券"></div>
 
@@ -290,10 +291,6 @@
 
         <div class="cp-fld"><label>有效期限</label><input type="date" id="cp-exp"></div>
 
-        <div class="cp-fld"><label>適用通路</label>
-          <div id="cp-ch" class="seg"></div>
-          <div class="hint" style="margin-top:5px;">可複選，至少選一個</div>
-        </div>
 
         <div class="cp-fld"><label>發送對象</label>
           <select id="cp-target" onchange="countTargets()">
@@ -395,7 +392,6 @@ Object.defineProperty(window, "SHOP", { get: ()=>curSet() });
 
 /* ══ 優惠券 ══ */
 let CP_TYPE = "amount";
-let CP_CH = ["fs","sm","dl"];
 let MEMBERS_CACHE = [];
 const LV_NEED = [0, 2000, 6000, 12000];
 
@@ -407,15 +403,10 @@ window.setCpType = t=>{
   $("cp-value").value = t==="amount"? 50 : 9;
 };
 function renderCpCh(){
-  const el = $("cp-ch"); if(!el) return;
-  el.innerHTML = CH.map(c=>
-    `<button class="seg-b ${CP_CH.includes(c.k)?"on":""}" onclick="toggleCpCh('${c.k}')">${c.n}</button>`).join("");
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  const el = $("cp-scope");
+  if(el) el.innerHTML = `此處發送的券<b>只能在「${cur.n}」使用</b>。<br>優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。`;
 }
-window.toggleCpCh = k=>{
-  CP_CH = CP_CH.includes(k)? CP_CH.filter(x=>x!==k) : [...CP_CH, k];
-  if(!CP_CH.length) CP_CH = [k];
-  renderCpCh();
-};
 async function loadMembers(){
   try{
     const snap = await getDocs(collection(db,"members"));
@@ -459,13 +450,13 @@ window.sendCoupon = async ()=>{
   try{
     const cref = await addDoc(collection(db,"coupons"), {
       name, type:CP_TYPE, value:val, minSpend:min, expire:exp,
-      channels:[...CP_CH], target:$("cp-target").value,
+      channels:[EDIT_CH], target:$("cp-target").value,
       issued:list.length, used:0, createdAt: serverTimestamp()
     });
     for(const m of list){
       await setDoc(doc(db,"usercoupons", m.uid + "_" + cref.id), {
         uid:m.uid, cid:cref.id, name, type:CP_TYPE, value:val, minSpend:min,
-        expire:exp, channels:[...CP_CH], used:false, createdAt: serverTimestamp()
+        expire:exp, channels:[EDIT_CH], used:false, createdAt: serverTimestamp()
       });
     }
     toast(`已發送 ${list.length} 張`);
@@ -481,6 +472,7 @@ async function loadCoupons(){
   try{
     const snap = await getDocs(collection(db,"coupons"));
     const arr = snap.docs.map(d=>({id:d.id, ...d.data()}))
+      .filter(c=>(c.channels||[]).includes(EDIT_CH))
       .sort((a,b)=>(b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0));
     const today = new Date().toISOString().slice(0,10);
     $("cp-list").innerHTML = arr.length? arr.map(c=>{
@@ -646,6 +638,7 @@ window.pickShop = k=>{
   knownIds = null;              /* 換通路不要誤判成新單 */
   dirty.clear();
   renderMenu(); renderSettings(); renderOff(); renderAnnPhoto();
+  renderCpCh(); loadCoupons();
   renderOrders();
   toast("已切換至「" + c.n + "」");
 };
@@ -726,7 +719,20 @@ function onOrders(list){
   ORDERS = list;
   const ids = new Set(ORDERS.map(o=>o.docId));
   if(knownIds){
-    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId) && inMyShop(o));
+    const all = ORDERS.filter(o=>!knownIds.has(o.docId));
+    const other = all.filter(o=>!inMyShop(o));
+    if(other.length){
+      const el = $("other-alert");
+      if(el){
+        const names = [...new Set(other.map(o=>{
+          const c = CH.find(x=> x.type==="delivery"? o.type==="delivery" : (o.pickup && o.pickup.market===x.n));
+          return c? c.n : "其他通路";
+        }))];
+        el.innerHTML = `其他通路有新訂單（${names.join("、")}）・按上方「切換」查看`;
+        el.style.display = "block";
+      }
+    }
+    const fresh = all.filter(o=>inMyShop(o));
     if(fresh.length){
       beep();
       const n = fresh[0];
@@ -901,7 +907,27 @@ function renderOrders(){
       || (stF==="done"&&isDone(o)) || (stF==="cancelled"&&isCancelled(o));
     return stOK;
   });
-  if(!show.length){ $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。</div>`; return; }
+  if(!show.length){
+    const t2 = todayStr();
+    const cnt = {
+      today: MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&(o.type!=="pickup"||(o.pickup&&o.pickup.date<=t2))).length,
+      pre:   MINE.filter(o=>!isDone(o)&&!isCancelled(o)&&o.type==="pickup"&&o.pickup&&o.pickup.date>t2).length,
+      done:  MINE.filter(isDone).length,
+      cancelled: MINE.filter(isCancelled).length
+    };
+    const NAME = {today:"今日待處理", pre:"預購單", done:"已結帳", cancelled:"已取消"};
+    const others = Object.keys(cnt).filter(k=>k!==stF && cnt[k]>0);
+    const otherCh = ORDERS.filter(o=>!inMyShop(o)).length;
+    $("list").innerHTML = `<div class="empty">
+      此分類目前沒有訂單。
+      ${others.length? `<br><br><span style="font-size:12.5px;">訂單在這些分類：${
+        others.map(k=>`<b style="color:var(--wine);">${NAME[k]} ${cnt[k]}</b>`).join("、")}</span>`:""}
+      ${otherCh? `<br><span style="font-size:12.5px;">其他通路還有 <b style="color:var(--wine);">${otherCh}</b> 張訂單，可按上方「切換」查看。</span>`:""}
+      ${(!MINE.length && !ORDERS.length)? `<br><br><span style="font-size:12px;color:var(--ink-soft);">資料庫目前讀到 0 筆訂單。</span>`:""}
+      <br><br><span style="font-size:11.5px;color:var(--ink-soft);">資料庫共 ${ORDERS.length} 筆・本通路 ${MINE.length} 筆</span>
+    </div>`;
+    return;
+  }
   $("list").innerHTML = show.map(({o})=>{
     const id = o.docId;
     const st = ST_LABEL[o.status] || [o.status,"wait"];
