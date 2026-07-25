@@ -1625,10 +1625,15 @@ if(cfg.apiKey && cfg.projectId){
     }
 
     // ── 付款返回提示 ──
-    const paidNo = qs.get("paid");
-    if(paidNo){
+    const paid = qs.get("paid");
+    if(paid !== null){
       history.replaceState({}, "", location.pathname);
-      setTimeout(()=>alert("付款流程已完成，訂單編號 " + paidNo + "。\n可至會員中心查看訂單狀態。"), 300);
+      cart = {};   // 清空購物車
+      if(paid === "1"){
+        setTimeout(()=>alert("付款成功！\n\n訂單已成立，可至「會員中心」查看訂單與取餐號碼。"), 400);
+      } else {
+        setTimeout(()=>alert("付款未完成或已取消。\n\n如需訂購請重新下單；若已扣款請聯繫店家。"), 400);
+      }
     }
 
     // ── 會員狀態 ──
