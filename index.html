@@ -1056,7 +1056,7 @@ const STEPS = ["訂單成立","備貨中","完成"];
 
 /* ══ 會員等級 ══ */
 const LEVELS = [
-  {n:"初入江湖", icon:"🥢", need:0,     rate:1, perks:["入會送 30 點（下次手機預訂可以使用）","生日禮"]},
+  {n:"初入江湖", icon:"🥢", need:0,     rate:1, perks:["入會送 30 點（下次手機預訂可以使用）","記得到會員資料填生日，生日當月訂購享生日優惠"]},
   {n:"滷林高手", icon:"🍢", need:2000,  rate:1, perks:["點數 1 倍","每月會員日・闆娘小驚喜"]},
   {n:"滷味宗師", icon:"🍖", need:6000,  rate:2, perks:["點數 2 倍","每月優惠券","新品優先試吃"]},
   {n:"滷味霸主", icon:"👑", need:12000, rate:3, perks:["點數 3 倍","生日豪華禮","專屬活動與隱藏優惠"]}
@@ -1555,8 +1555,10 @@ if(cfg.apiKey && cfg.projectId){
       const chMap = {};
       for(const c of CH){
         const cs = await getDoc(doc(db, "settings", "ch_"+c.k));
-        chMap[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[]},
+        chMap[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[],
+                                    onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20},
                                    cs.exists()? cs.data() : {});
+        console.log("通路", c.k, "讀到 open =", cs.exists()? cs.data().open : "(文件不存在)");
       }
       applyShopSettings(Object.assign({}, g.exists()? g.data():{}, {ch: chMap}));
       renderChList();

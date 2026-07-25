@@ -496,9 +496,8 @@ function fillGiftOptions(){
   sel.innerHTML = opts.join("") || `<option value="">目前沒有商品</option>`;
 }
 function renderCpCh(){
-  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   const el = $("cp-scope");
-  if(el) el.innerHTML = `此處發送的券<b>只能在「${cur.n}」使用</b>。<br>優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。`;
+  if(el) el.innerHTML = `發送的券<b>三個取貨點都能使用</b>。<br>優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。`;
 }
 async function loadMembers(){
   try{
@@ -554,7 +553,7 @@ window.sendCoupon = async ()=>{
     }
     const base = {
       name, type:CP_TYPE, value: CP_TYPE==="gift"? 0 : val, minSpend: minSp, expire:exp,
-      giftKey, giftName, giftPhoto: (CP_TYPE==="gift"? (giftPhoto||"") : ""), channels:[EDIT_CH]
+      giftKey, giftName, giftPhoto: (CP_TYPE==="gift"? (giftPhoto||"") : ""), channels:["fs","sm","dl"]
     };
     const cref = await addDoc(collection(db,"coupons"), Object.assign({}, base, {
       target:$("cp-target").value, issued:list.length, used:0, createdAt: serverTimestamp()
@@ -577,7 +576,6 @@ async function loadCoupons(){
   try{
     const snap = await getDocs(collection(db,"coupons"));
     const arr = snap.docs.map(d=>({id:d.id, ...d.data()}))
-      .filter(c=>(c.channels||[]).includes(EDIT_CH))
       .sort((a,b)=>(b.createdAt&&b.createdAt.toMillis?b.createdAt.toMillis():0)-(a.createdAt&&a.createdAt.toMillis?a.createdAt.toMillis():0));
     const today = new Date().toISOString().slice(0,10);
     $("cp-list").innerHTML = arr.length? arr.map(c=>{
