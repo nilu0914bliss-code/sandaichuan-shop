@@ -899,6 +899,7 @@ function openCheckout(){
   go("p-checkout"); setShipMethod(shipMethod); renderCpBox(); renderPtBox();
 }
 async function pay(){
+ try {
   // ── 送出前檢查必填，缺哪個就提示並跳到該欄位 ──
   const need = [];
   if(!$("f-name").value.trim()) need.push(["f-name","請填寫姓名"]);
@@ -1051,6 +1052,11 @@ async function pay(){
     : `付款完成後 <b>2～3 天內</b>出貨。<br><span style="font-size:12.5px;color:var(--ink-soft);">宅配單號與訂單進度可至「會員中心」查詢</span>`) + payNote + saveNote;
   cart = {}; renderMenu(); renderBar(); renderCart();
   go("p-done");
+ } catch(err){
+   console.error("送出訂單發生錯誤", err);
+   alert("送出訂單時發生錯誤：\n\n" + (err && err.message ? err.message : err) + "\n\n請截圖回報，我們會盡快處理。");
+   const b = $("pay-btn"); if(b){ b.disabled=false; syncPayBtn(); }
+ }
 }
 
 /* ── 會員 ── */
