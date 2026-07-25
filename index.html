@@ -347,7 +347,7 @@
     <button class="back" onclick="go('p-cart')">‹</button>
     <h2>填寫訂購資訊</h2>
   </div>
-  <form onsubmit="event.preventDefault(); pay();">
+  <form onsubmit="event.preventDefault(); event.stopPropagation(); pay(); return false;">
     <div class="f-sec">取 貨 方 式</div>
     <div style="background:var(--cream-soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
       <span id="ck-ch-ic" style="font-size:19px;"></span>
@@ -359,17 +359,17 @@
     </div>
 
     <div class="f-sec">訂 購 人</div>
-    <div class="field"><label>姓名 *</label><input id="f-name" required placeholder="王小明"></div>
-    <div class="field"><label>手機 *</label><input id="f-phone" required type="tel" placeholder="0912-345-678"></div>
+    <div class="field"><label>姓名 *</label><input id="f-name" placeholder="王小明"></div>
+    <div class="field"><label>手機 *</label><input id="f-phone" type="tel" placeholder="0912-345-678"></div>
     <div class="field" id="email-field"><label>Email</label><input id="f-email" type="email" placeholder="付款收據寄送用（選填）"></div>
 
     <div id="ship-fields">
     <div class="f-sec">取 貨 門 市（7-11 冷凍店到店）</div>
     <div class="hint" style="margin:-2px 0 10px;">宅配訂單於付款後 2～3 天內寄出，宅配單號會更新於「會員中心」。冷凍運費 NT$ 160、滿 NT$ 1,000 免運（暫定，依店家確認調整）</div>
     <div class="field"><label>縣市 *</label>
-      <select id="f-city" required><option value="">請選擇</option><option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option><option>台南市</option><option>高雄市</option><option>其他縣市</option></select>
+      <select id="f-city"><option value="">請選擇</option><option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option><option>台南市</option><option>高雄市</option><option>其他縣市</option></select>
     </div>
-    <div class="field"><label>門市名稱 *</label><input id="f-store" required placeholder="例：光復門市">
+    <div class="field"><label>門市名稱 *</label><input id="f-store" placeholder="例：光復門市">
       <div class="hint">請確認該門市有提供「冷凍交貨便」服務（正式版會附門市查詢連結）</div>
     </div>
     </div>
@@ -773,8 +773,6 @@ function applyShopUI(){
   if(d) d.textContent = c.type==="pickup"? "市場自取・免運費" : "7-11 冷凍店到店";
   $("ship-fields").style.display = c.type==="delivery"?"block":"none";
   $("pickup-fields").style.display = c.type==="pickup"?"block":"none";
-  $("f-city").required = $("f-store").required = (c.type==="delivery");
-  $("f-pdate").required = $("f-ptime").required = (c.type==="pickup");
   const ef = $("email-field"); if(ef) ef.style.display = (c.type==="pickup")? "none":"block";
   if(c.type==="pickup"){ $("f-pmarket").value = c.n; }
 }
