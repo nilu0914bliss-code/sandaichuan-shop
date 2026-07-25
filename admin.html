@@ -878,13 +878,16 @@ function onOrders(list){
   ORDERS = list;
   const ids = new Set(ORDERS.map(o=>o.docId));
   if(knownIds){
-    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId) && inMyShop(o));
-    if(fresh.length){
+    const allFresh = ORDERS.filter(o=>!knownIds.has(o.docId) && inMyShop(o));
+    // 只有「今天取貨」的自取新單才響鈴、通知、自動印；預購單安靜進來
+    const t = todayStr();
+    const todayFresh = allFresh.filter(o=> o.type==="pickup" && o.pickup && o.pickup.date===t);
+    if(todayFresh.length){
       beep();
-      const n = fresh[0];
-      $("new-alert").innerHTML = `🔔 新訂單 ${fresh.length} 張：${n.orderNo||""} ${n.name||""}${n.type==="pickup"&&n.pickup? "（自取 "+n.pickup.market+" "+(n.pickup.slot||"")+"）":"（宅配）"}`;
+      const n = todayFresh[0];
+      $("new-alert").innerHTML = `🔔 今日新訂單 ${todayFresh.length} 張：${n.orderNo||""} ${n.name||""}（${n.pickup.market} ${n.pickup.slot||""}）`;
       $("new-alert").style.display = "block";
-      if(autoPrint) fresh.forEach((o,i)=> setTimeout(()=> sendToPrinter(buildTicket(o)), i*1500));
+      if(autoPrint) todayFresh.forEach((o,i)=> setTimeout(()=> sendToPrinter(buildTicket(o)), i*1500));
     }
   }
   knownIds = ids;
