@@ -242,7 +242,6 @@
       <span class="sw-lb" id="snd-state" style="flex:1;">🔕 點畫面任一處即可開啟提示音</span>
       <button class="btn" style="background:#fff;border:1px solid var(--wine);color:var(--wine);padding:7px 14px;font-size:12.5px;" onclick="testBeep()">測試音效</button>
     </div>
-    <div id="other-alert" onclick="this.style.display='none'" style="display:none;margin:10px 16px 0;background:var(--cream-soft);border:1px solid #E4C98A;color:var(--gold);padding:10px 14px;border-radius:6px;font-size:12.5px;font-weight:700;line-height:1.6;cursor:pointer;"></div>
     <div id="new-alert" onclick="this.style.display='none'" style="display:none;margin:10px 16px 0;background:#C8351F;color:#fff;padding:11px 14px;border-radius:6px;font-size:13.5px;font-weight:700;line-height:1.6;cursor:pointer;">新訂單</div>
     <div class="list" id="list"><div class="empty">載入中…</div></div>
   </div>
@@ -880,20 +879,7 @@ function onOrders(list){
   ORDERS = list;
   const ids = new Set(ORDERS.map(o=>o.docId));
   if(knownIds){
-    const all = ORDERS.filter(o=>!knownIds.has(o.docId));
-    const other = all.filter(o=>!inMyShop(o));
-    if(other.length){
-      const el = $("other-alert");
-      if(el){
-        const names = [...new Set(other.map(o=>{
-          const c = CH.find(x=> x.type==="delivery"? o.type==="delivery" : (o.pickup && o.pickup.market===x.n));
-          return c? c.n : "其他通路";
-        }))];
-        el.innerHTML = `其他通路有新訂單（${names.join("、")}）・按上方「切換」查看`;
-        el.style.display = "block";
-      }
-    }
-    const fresh = all.filter(o=>inMyShop(o));
+    const fresh = ORDERS.filter(o=>!knownIds.has(o.docId) && inMyShop(o));
     if(fresh.length){
       beep();
       const n = fresh[0];
@@ -1069,10 +1055,7 @@ function renderOrders(){
     return stOK;
   });
   if(!show.length){
-    const otherCh = ORDERS.filter(o=>!inMyShop(o) && !isDone(o) && !isCancelled(o)).length;
-    $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。${
-      otherCh? `<div style="margin-top:14px;font-size:12.5px;color:var(--ink-soft);">其他通路有 ${otherCh} 張待處理，可按上方「切換」查看</div>`:""
-    }</div>`;
+    $("list").innerHTML = `<div class="empty">此分類目前沒有訂單。</div>`;
     return;
   }
   $("list").innerHTML = show.map(({o})=>{
