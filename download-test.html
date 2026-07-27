@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自動下載測試</title>
+<style>
+  body{ font-family: sans-serif; margin:0; padding:24px; background:#faf6ef; color:#3a2a1a; line-height:1.7; }
+  h1{ font-size:20px; color:#7a1f1a; }
+  button{ font-size:22px; font-weight:700; padding:18px 28px; margin:10px 0; border:none; border-radius:10px; background:#7a1f1a; color:#fff; width:100%; }
+  .box{ background:#fff; border-radius:12px; padding:18px; margin:16px 0; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+  .step{ font-size:16px; }
+  .big{ font-size:18px; font-weight:700; color:#7a1f1a; }
+  ol{ padding-left:20px; }
+  li{ margin:8px 0; }
+  #log{ font-size:14px; color:#666; margin-top:10px; }
+</style>
+</head>
+<body>
+  <h1>三代傳 · 自動下載測試</h1>
+
+  <div class="box">
+    <p class="step">這頁只做一件事：測試「網頁自動下載檔案」會不會跳確認。</p>
+    <p class="step">按下面的按鈕，它會自動下載一個叫 <b>test-ticket.png</b> 的小圖檔。</p>
+  </div>
+
+  <button onclick="doDownload()">▶ 按這裡，自動下載測試檔</button>
+
+  <div class="box">
+    <p class="big">請注意觀察：</p>
+    <ol>
+      <li>有沒有跳出<b>「要下載嗎 / 允許下載」</b>之類的視窗？</li>
+      <li>檔案有沒有<b>直接、安靜地</b>下載好（通常螢幕下方會閃一下下載完成）？</li>
+      <li>去平板的<b>「檔案」App → Download 資料夾</b>看看，有沒有出現 test-ticket.png？</li>
+    </ol>
+    <p id="log"></p>
+  </div>
+
+<script>
+function doDownload(){
+  // 產生一張小小的 PNG（跟正式列印同樣的手法：canvas → dataURL → 下載）
+  const cv = document.createElement("canvas");
+  cv.width = 384; cv.height = 120;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0,0,384,120);
+  ctx.fillStyle = "#000"; ctx.font = "bold 32px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("三代傳 測試", 192, 45);
+  ctx.font = "20px sans-serif";
+  ctx.fillText(new Date().toLocaleTimeString(), 192, 85);
+
+  const dataUrl = cv.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = "test-ticket.png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  document.getElementById("log").textContent = "已觸發下載（" + new Date().toLocaleTimeString() + "）。請看有沒有跳確認、檔案有沒有進 Download。";
+}
+</script>
+</body>
+</html>
