@@ -967,122 +967,254 @@ function buildTicket(o){
 }
 
 /* 把小票資料畫成 58mm 熱感紙寬度（384 點）的黑白 PNG，回傳 dataURL */
+/* 取品項副標（規格）：品名若含括號規格就抽出來當副標，例如「甘蔗煙燻土雞（全雞）」→「（全雞）」。
+   贈品那類（🎁…）或沒有括號的，回空字串。 */
+function itemSub(x){
+  const m = String(x.name||"").match(/（[^）]*）\s*$/);
+  return m ? m[0].trim() : "";
+}
+/* 品名去掉尾端括號規格後的主名稱（配合 itemSub 顯示） */
+function itemMain(x){
+  return String(x.name||"").replace(/（[^）]*）\s*$/, "").trim();
+}
+/* 畫「標籤：值」，冒號對齊在固定欄位 */
+function drawLabelValue(ctx, label, value, y, font, padX){
+  const labelW = 88;   /* 標籤欄寬度（冒號固定位置） */
+  ctx.font = font; ctx.fillStyle = "#000"; ctx.textAlign = "left";
+  ctx.fillText(label, padX, y);
+  ctx.fillText("：", padX + labelW, y);
+  ctx.fillText(String(value||""), padX + labelW + 30, y);
+}
+
+/* 由日期字串（如 2026-07-27）算出中文星期，回傳「（一）」等；算不出就回空字串 */
+function weekdayZh(dateStr){
+  if(!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  if(isNaN(d.getTime())) return "";
+  return "（" + "日一二三四五六"[d.getDay()] + "）";
+}
+/* 付款方式顯示文字 */
+function payLabel(d){
+  if(d.payMethod === "cash") return "現金（取貨時付款）";
+  if(d.payMethod === "linepay") return "LINE Pay";
+  if(d.payMethod === "card") return "信用卡";
+  return "線上付款";
+}
+/* 付款方式（簡短版，給「付款方式：」那行用） */
+function payShort(d){
+  if(d.payMethod === "cash") return "現金";
+  if(d.payMethod === "linepay") return "LINE Pay";
+  if(d.payMethod === "card") return "信用卡";
+  return "線上付款";
+}
+/* 畫圓角矩形路徑（給單號框、數量框用） */
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y,   x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x,   y+h, r);
+  ctx.arcTo(x,   y+h, x,   y,   r);
+  ctx.arcTo(x,   y,   x+w, y,   r);
+  ctx.closePath();
+}
+
 function renderTicketImage(d){
   const W = 384;            /* 58mm 熱感機標準點寬 */
-  const PAD = 16;           /* 左右留白 */
-  const contentW = W - PAD*2;
+  const PAD = 18;           /* 左右留白 */
   const cv = document.createElement("canvas");
   const ctx = cv.getContext("2d");
 
-  /* 字體設定（放大版，阿姨遠一點也看得清） */
-  const F_TITLE = "bold 46px sans-serif";   /* 招牌「三代傳」 */
-  const F_BIG   = "bold 30px sans-serif";   /* 強調行（自取店、現金應收） */
-  const F_BODY  = "26px sans-serif";        /* 一般內文 */
-  const F_BOLD  = "bold 26px sans-serif";
-  const F_SMALL = "20px sans-serif";        /* 下單時間（縮小） */
-  const LH = 38;            /* 一般行高 */
-  const LH_S = 30;          /* 小字行高 */
+  /* 字體（學貝穀排版：招牌大、品名放大、合計粗大） */
+  const F_TITLE = "bold 50px sans-serif";   /* 招牌「三代傳」 */
+  const F_WAY   = "bold 30px sans-serif";   /* 自取／宅配 */
+  const F_PAY   = "24px sans-serif";         /* 付款方式 */
+  const F_NO    = "bold 34px sans-serif";   /* 單號（方框內） */
+  const F_TIME  = "bold 28px sans-serif";   /* 取餐時間 */
+  const F_TLBL  = "22px sans-serif";         /* 「取餐時間」小標 */
+  const F_THEAD = "22px sans-serif";         /* 三欄標題 */
+  const F_INAME = "bold 30px sans-serif";   /* 品名（放大但不致撞到金額） */
+  const F_ISUB  = "22px sans-serif";         /* 品項副標（規格） */
+  const F_QTY   = "bold 26px sans-serif";   /* 數量（方框內） */
+  const F_AMT   = "bold 30px sans-serif";   /* 金額 */
+  const F_BODY  = "26px sans-serif";         /* 一般內文（優惠券等） */
+  const F_SUML  = "bold 34px sans-serif";   /* 合計 標籤 */
+  const F_SUMR  = "bold 44px sans-serif";   /* 合計 金額 */
+  const F_CASH  = "bold 30px sans-serif";   /* 現金應收／線上已付 */
+  const F_FOOT  = "26px sans-serif";         /* 底部訂購資訊 */
+  const F_SMALL = "20px sans-serif";         /* 下單時間 */
 
-  /* ── 第一階段：先量測需要的總高度 ── */
+  const LH = 40, LH_S = 30;
+
+  /* ── 第一階段：量測總高度（寬鬆版） ── */
   let h = 0;
-  h += 20;                  /* 頂部留白 */
-  h += 60;                  /* 招牌標題 */
-  h += 16;                  /* 分隔線 */
-  h += LH;                  /* 單號 */
-  h += 12;
-  h += LH;                  /* 自取/宅配 標題 */
-  h += LH;                  /* 市場/門市 第二行 */
-  h += 16;                  /* 分隔線 */
-  h += LH * d.items.length; /* 品項 */
-  h += 16;                  /* 分隔線 */
-  if(d.shipFee) h += LH;
-  if(d.couponDiscount) h += LH;
-  if(d.pointsUsed) h += LH;
-  h += LH;                  /* 合計 */
-  h += LH + 6;              /* 付款狀態強調行 */
-  h += 16;                  /* 分隔線 */
-  h += LH;                  /* 滷汁 */
-  h += LH;                  /* 訂購人 */
-  if(d.note) h += LH;       /* 備註 */
-  h += 14;                  /* 下單時間前的細線 */
-  h += LH_S;                /* 下單時間（最下方、縮小） */
-  h += 40;                  /* 底部留白（走紙用） */
+  h += 28;                          /* 頂部留白 */
+  h += 64;                          /* 招牌 */
+  h += 24;                          /* 招牌下留白 */
+  h += 40;                          /* 自取／宅配 */
+  h += 38;                          /* 付款方式 */
+  h += 24;
+  h += 60;                          /* 單號方框列 */
+  h += 18;
+  h += 44;                          /* 取餐時間第一行 */
+  if(d.type === "pickup") h += 38;  /* 取餐時間第二行 */
+  h += 28;
+  h += 40;                          /* 三欄標題列 */
+  /* 品項：每項 品名(50) + 副標(34) + 間距(20) */
+  d.items.forEach(x=>{ h += 50 + (itemSub(x) ? 34 : 0) + 20; });
+  h += 14;
+  if(d.sauce && d.sauce!=="-" && d.sauce!==""){ h += 48; }  /* 滷汁 */
+  if(d.shipFee) h += 46;
+  if(d.couponDiscount) h += 46;
+  if(d.pointsUsed) h += 46;
+  h += 24;                          /* 合計上方粗線 */
+  h += 58;                          /* 合計 */
+  h += 50;                          /* 付款方式 */
+  h += 24;
+  h += 46;                          /* 訂購人 */
+  h += 46;                          /* 電話 */
+  if(d.note) h += 46;               /* 備註 */
+  h += 20;                          /* 下單時間細線 */
+  h += 36;                          /* 下單時間 */
+  h += 48;                          /* 底部走紙留白 */
 
   cv.width = W;
   cv.height = h;
 
-  /* ── 第二階段：實際繪製 ── */
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, W, h);
-  ctx.fillStyle = "#000";
-  ctx.textBaseline = "top";
+  /* ── 第二階段：繪製 ── */
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, h);
+  ctx.fillStyle = "#000"; ctx.textBaseline = "top";
 
-  let y = 20;
+  const left   = (t,f,x)=>{ ctx.font=f; ctx.textAlign="left";   ctx.fillText(t, x==null?PAD:x, y); };
+  const right  = (t,f)=>{ ctx.font=f; ctx.textAlign="right";  ctx.fillText(t, W-PAD, y); };
+  const center = (t,f)=>{ ctx.font=f; ctx.textAlign="center"; ctx.fillText(t, W/2, y); };
+  const solid  = (lw)=>{ ctx.strokeStyle="#000"; ctx.lineWidth=lw; ctx.beginPath(); ctx.moveTo(PAD,y); ctx.lineTo(W-PAD,y); ctx.stroke(); };
 
-  /* 招牌標題（置中、加大加粗） */
-  ctx.font = F_TITLE;
-  ctx.textAlign = "center";
-  ctx.fillText("三代傳", W/2, y);
+  let y = 24;
+
+  /* 招牌 */
+  ctx.font = F_TITLE; ctx.textAlign = "center";
+  ctx.fillText("三代傳", W/2, y); y += 64;
+  y += 24;
+
+  /* 自取／宅配 + 付款方式 */
+  if(d.type === "pickup"){ left("自取", F_WAY); } else { left("冷凍宅配", F_WAY); }
+  y += 40;
+  left(payLabel(d), F_PAY); y += 38;
+  y += 24;
+
+  /* 單號方框 */
+  ctx.font = F_NO;
+  const noText = d.orderNo || "";
+  const noW = ctx.measureText(noText).width;
+  const boxPadX = 12, boxPadY = 8, boxH = 52;
+  ctx.lineWidth = 3; ctx.strokeStyle = "#000";
+  roundRect(ctx, PAD, y, noW + boxPadX*2, boxH, 6); ctx.stroke();
+  ctx.textAlign = "left"; ctx.fillStyle = "#000";
+  ctx.fillText(noText, PAD + boxPadX, y + boxPadY);
   y += 60;
+  y += 18;
 
-  const dashed = ()=>{ drawDashed(ctx, PAD, y+6, W-PAD, y+6, 2); y += 16; };
-  const dashedThin = ()=>{ drawDashed(ctx, PAD, y+6, W-PAD, y+6, 1); y += 14; };
-
-  /* 左對齊工具 */
-  const left = (text, font)=>{ ctx.font = font; ctx.textAlign = "left"; ctx.fillText(text, PAD, y); };
-  /* 左右對齊工具（品項名 + 右側數量金額） */
-  const row = (lft, rgt, font)=>{
-    ctx.font = font;
-    ctx.textAlign = "left";  ctx.fillText(lft, PAD, y);
-    ctx.textAlign = "right"; ctx.fillText(rgt, W-PAD, y);
-  };
-  const center = (text, font)=>{ ctx.font = font; ctx.textAlign = "center"; ctx.fillText(text, W/2, y); };
-
-  dashed();
-
-  left("單號  " + d.orderNo, F_BODY); y += LH;
-  y += 12;
-
+  /* 取餐時間（自取）／門市（宅配） */
   if(d.type === "pickup" && d.pickup){
-    left("［ 自取 ］" + (d.pickup.market || ""), F_BIG); y += LH;
-    left("  " + (d.pickup.date || "") + "  " + (d.pickup.slot || ""), F_BODY); y += LH;
+    const dateStr = (d.pickup.date||"") + weekdayZh(d.pickup.date);   /* 日期 + （週幾） */
+    const slotStr = d.pickup.slot || "";
+    const tx = PAD + 104;
+    /* 「取餐時間」小標，與日期行垂直置中對齊 */
+    const labelPx = 22, datePx = 26;
+    const offset = Math.max(0, (datePx - labelPx) / 2);
+    ctx.font = labelPx + "px sans-serif"; ctx.textAlign = "left"; ctx.fillStyle = "#000";
+    ctx.fillText("取餐時間", PAD, y + offset);
+    /* 第一行：日期（週幾） */
+    ctx.font = "bold " + datePx + "px sans-serif";
+    ctx.fillText(dateStr, tx, y);
+    y += 40;
+    /* 第二行：時段（幾點幾分），放在日期正下方、對齊 tx */
+    ctx.font = "bold 26px sans-serif";
+    ctx.fillText(slotStr, tx, y);
+    y += 18;
   } else {
-    left("［ 冷凍宅配 ］", F_BIG); y += LH;
-    left("  7-11 " + ((d.store&&d.store.city)||"") + " " + ((d.store&&d.store.name)||""), F_BODY); y += LH;
+    left("7-11 " + ((d.store&&d.store.city)||"") + " " + ((d.store&&d.store.name)||""), F_TIME);
+    y += 44;
   }
+  y += 28;
 
-  dashed();
+  /* 三欄標題列 */
+  solid(2); y += 4;
+  ctx.font = F_THEAD; ctx.fillStyle = "#000";
+  ctx.textAlign = "left";   ctx.fillText("數量", PAD, y);
+  ctx.textAlign = "center"; ctx.fillText("品名", W/2, y);
+  ctx.textAlign = "right";  ctx.fillText("金額", W-PAD, y);
+  y += 36; solid(1); y += 6;
 
+  /* 品項（數量方框 + 品名大字 + 副標 + 金額，三者垂直對齊同一基線） */
   d.items.forEach(x=>{
-    row(x.name, "x"+x.qty+"  "+(x.price*x.qty), F_BODY); y += LH;
+    const rowTop = y;
+    const nameBaseline = rowTop + 6;   /* 品名、金額共用的基線 */
+    const amtStr = String(x.price*x.qty);
+    /* 先量金額寬度 */
+    ctx.font = F_AMT;
+    const amtW = ctx.measureText(amtStr).width;
+    /* 品名（放大；太長自動縮字） */
+    const nameX = PAD + 54;
+    const nameMaxW = (W - PAD - amtW - 16) - nameX;
+    let nameFontPx = 30;
+    do {
+      ctx.font = "bold " + nameFontPx + "px sans-serif";
+      if(ctx.measureText(itemMain(x)).width <= nameMaxW || nameFontPx <= 20) break;
+      nameFontPx -= 2;
+    } while(true);
+    /* 數量方框：垂直對齊品名中線 */
+    const qBoxH = 34, qBoxY = nameBaseline + (nameFontPx - qBoxH)/2 - 2;
+    ctx.font = F_QTY; ctx.lineWidth = 2; ctx.strokeStyle = "#000";
+    roundRect(ctx, PAD, qBoxY, 40, qBoxH, 4); ctx.stroke();
+    ctx.textAlign = "center"; ctx.fillStyle = "#000";
+    ctx.fillText(String(x.qty), PAD + 20, qBoxY + 4);
+    /* 品名 */
+    ctx.font = "bold " + nameFontPx + "px sans-serif";
+    ctx.textAlign = "left"; ctx.fillStyle = "#000";
+    ctx.fillText(itemMain(x), nameX, nameBaseline);
+    /* 金額：與品名同基線，但因字級可能不同，微調對齊 */
+    ctx.font = F_AMT; ctx.textAlign = "right";
+    ctx.fillText(amtStr, W-PAD, nameBaseline + (nameFontPx - 30)/2);
+    y += Math.max(46, nameFontPx + 14);
+    /* 副標（規格） */
+    const sub = itemSub(x);
+    if(sub){ left(sub, F_ISUB, nameX); y += 34; }
+    y += 20;
   });
 
-  dashed();
+  y += 14;
 
-  if(d.shipFee){ row("運費", String(d.shipFee), F_BODY); y += LH; }
-  if(d.couponDiscount){ row("優惠券", "-" + d.couponDiscount, F_BODY); y += LH; }
-  if(d.pointsUsed){ row("點數折抵", "-" + d.pointsUsed, F_BODY); y += LH; }
-  row("合計", String(d.total), F_BOLD); y += LH;
-
-  /* 付款狀態：現金→應收提醒；線上→已付+金額 */
-  if(d.payMethod === "cash"){
-    center("** 現金應收 " + d.total + " 元 **", F_BIG); y += LH + 6;
-  } else {
-    center("（ 線上已付 " + d.total + " ）", F_BIG); y += LH + 6;
+  /* 滷汁（移到品項下方，冒號對齊底部欄位） */
+  if(d.sauce && d.sauce!=="-" && d.sauce!==""){
+    drawLabelValue(ctx, "滷汁", d.sauce, y, F_BODY, PAD); y += 48;
   }
 
-  dashed();
+  /* 運費／優惠券／點數 */
+  if(d.shipFee){ left("運費", F_BODY); right(String(d.shipFee), F_BODY); y += 46; }
+  if(d.couponDiscount){ left("優惠券", F_BODY); right("-" + d.couponDiscount, F_BODY); y += 46; }
+  if(d.pointsUsed){ left("點數折抵", F_BODY); right("-" + d.pointsUsed, F_BODY); y += 46; }
 
-  left("滷汁  " + d.sauce, F_BODY); y += LH;
-  left("訂購  " + d.name + " " + d.phone, F_BODY); y += LH;
-  if(d.note){ left("備註  " + d.note, F_BODY); y += LH; }
+  /* 合計（粗線 + 大字） */
+  y += 14; solid(2); y += 14;
+  left("合計", F_SUML); right("$" + d.total, F_SUMR); y += 58;
 
-  /* 下單時間：移到最下方、縮小、細線隔開 */
-  dashedThin();
+  /* 付款方式 */
+  left("付款方式：" + payShort(d), F_CASH); y += 50;
+
+  /* 底部訂購資訊（冒號對齊） */
+  y += 24; drawDashed(ctx, PAD, y, W-PAD, y, 1);
+  ctx.fillStyle = "#000";
+  drawLabelValue(ctx, "訂購人", d.name, y, F_FOOT, PAD); y += 46;
+  drawLabelValue(ctx, "電話", d.phone, y, F_FOOT, PAD); y += 46;
+  if(d.note){ drawLabelValue(ctx, "備註", d.note, y, F_FOOT, PAD); y += 46; }
+
+  /* 下單時間 */
+  y += 10; drawDashed(ctx, PAD, y, W-PAD, y, 1); y += 14;
   ctx.fillStyle = "#000";
   left("下單 " + d.createdAt, F_SMALL); y += LH_S;
 
-  return cv;   /* 回傳 canvas 物件（單張列印與 PDF 批次都能重用；尺寸可讀 cv.width/height） */
+  return cv;   /* 回傳 canvas 物件（單張列印與 PDF 批次都能重用） */
 }
 
 /* canvas 沒有內建虛線畫法，自己畫一排短線 */
