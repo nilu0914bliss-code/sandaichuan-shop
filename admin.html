@@ -394,6 +394,56 @@
         </div></div>
       </div>
 
+      <!-- 註冊禮（新會員加入時自動發放） -->
+      <div class="scard" id="sc-signup">
+        <div class="scard-h" onclick="toggleCard('sc-signup',event)">
+          <i class="ic">🎁</i><span class="t">註冊禮</span>
+          <span class="sbadge" id="badge-signup"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">新會員加入時自動發放。修改後客人端會員中心說明會一起更新。</div>
+
+          <div class="sw-row"><span class="l">啟用註冊禮</span><button class="switch" id="sw-signup"></button></div>
+
+          <div class="cp-fld"><label>贈禮類型</label>
+            <div class="seg" style="flex-wrap:wrap;">
+              <button class="seg-b on" id="sg-t-points" onclick="setSgType('points')">送點數</button>
+              <button class="seg-b" id="sg-t-coupon" onclick="setSgType('coupon')">送優惠券</button>
+              <button class="seg-b" id="sg-t-gift" onclick="setSgType('gift')">送贈品</button>
+            </div>
+          </div>
+
+          <div id="sg-points-wrap">
+            <div class="cp-fld"><label>贈送點數</label>
+              <input type="number" id="sg-points" min="0" value="30"></div>
+          </div>
+
+          <div id="sg-coupon-wrap" style="display:none;">
+            <div class="cp-fld"><label>券名稱</label>
+              <input id="sg-cp-name" placeholder="例：新會員折價券"></div>
+            <div style="display:flex;gap:8px;">
+              <div class="cp-fld" style="flex:1;"><label>折抵金額</label>
+                <input type="number" id="sg-cp-value" min="1" value="50"></div>
+              <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                <input type="number" id="sg-cp-min" min="0" value="0" placeholder="0＝無門檻"></div>
+            </div>
+          </div>
+
+          <div id="sg-gift-wrap" style="display:none;">
+            <div class="cp-fld"><label>贈送品項</label>
+              <select id="sg-gift"></select></div>
+          </div>
+
+          <div class="cp-fld"><label>使用期限</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:var(--ink-soft);">領取後</span>
+              <input type="number" id="sg-days" min="1" value="3" style="width:80px;">
+              <span style="font-size:13px;color:var(--ink-soft);">天內使用完畢</span>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
       <!-- 線上付款（各通路獨立） -->
       <div class="scard" id="sc-pay">
         <div class="scard-h" onclick="toggleCard('sc-pay',event)">
@@ -473,7 +523,8 @@ function setView(v){
 
 /* ── 店家設定 ── */
 /* ══ 設定：全站 + 各通路 ══ */
-let GLOBAL = { onlinePayOpen:false };
+let GLOBAL = { onlinePayOpen:false,
+  signupGift: { on:true, type:"points", points:30, cpName:"新會員折價券", cpValue:50, cpMin:0, giftPid:"", days:3 } };
 let CHSET = {};   /* { fs:{open,annOn,annText,annImage,offDates}, sm:{...}, dl:{...} } */
 function curSet(){
   if(!CHSET[EDIT_CH]) CHSET[EDIT_CH] = {open:true, annOn:false, annText:"", annImage:"", offDates:[],
@@ -739,6 +790,7 @@ function renderSettings(){
 $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
 $("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
+$("sw-signup").onclick = ()=>{ const sw=$("sw-signup"); sw.classList.toggle("on"); };
 window.toggleCard = (id, e)=>{
   if(e && e.target && e.target.classList.contains("switch")) return;
   const c = $(id); if(c) c.classList.toggle("open");
@@ -762,7 +814,58 @@ async function loadSettings(){
         s.exists()? s.data() : {});
     }
   }catch(e){ console.error("讀取設定失敗", e); }
-  renderSettings(); renderOff(); renderAnnPhoto();
+  renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift();
+}
+
+/* ── 註冊禮設定 ── */
+function setSgType(t){
+  const g = GLOBAL.signupGift || {};
+  g.type = t; GLOBAL.signupGift = g;
+  ["points","coupon","gift"].forEach(k=>{
+    const btn = document.getElementById("sg-t-"+k);
+    if(btn) btn.classList.toggle("on", k===t);
+    const wrap = document.getElementById("sg-"+k+"-wrap");
+    if(wrap) wrap.style.display = (k===t)? "block":"none";
+  });
+}
+window.setSgType = setSgType;
+
+function renderSignupGift(){
+  const g = GLOBAL.signupGift || {on:true,type:"points",points:30,cpName:"",cpValue:50,cpMin:0,giftPid:"",days:3};
+  const sw = document.getElementById("sw-signup");
+  if(sw) sw.classList.toggle("on", g.on!==false);
+  const setV = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  setV("sg-points", g.points??30);
+  setV("sg-cp-name", g.cpName||"");
+  setV("sg-cp-value", g.cpValue??50);
+  setV("sg-cp-min", g.cpMin??0);
+  setV("sg-days", g.days??3);
+  /* 贈品下拉：用現有商品填 */
+  const sel = document.getElementById("sg-gift");
+  if(sel && typeof PRODUCTS!=="undefined"){
+    sel.innerHTML = PRODUCTS.map(p=>`<option value="${p.pid||p.docId}" ${((g.giftPid)===(p.pid||p.docId))?"selected":""}>${p.n}</option>`).join("");
+  }
+  setSgType(g.type||"points");
+  const badge = document.getElementById("badge-signup");
+  if(badge) badge.textContent = (g.on===false)? "關閉" :
+    (g.type==="points"? `送 ${g.points} 點` : g.type==="coupon"? "送券" : "送贈品");
+}
+
+function collectSignupGift(){
+  const num = id => +((document.getElementById(id)||{}).value || 0);
+  const val = id => ((document.getElementById(id)||{}).value || "").trim();
+  const sw = document.getElementById("sw-signup");
+  const g = GLOBAL.signupGift || {};
+  return {
+    on: sw ? sw.classList.contains("on") : true,
+    type: g.type || "points",
+    points: num("sg-points"),
+    cpName: val("sg-cp-name") || "新會員折價券",
+    cpValue: num("sg-cp-value"),
+    cpMin: num("sg-cp-min"),
+    giftPid: (document.getElementById("sg-gift")||{}).value || "",
+    days: num("sg-days") || 3
+  };
 }
 $("btn-save-set").onclick = async ()=>{
   const s = curSet();
@@ -774,6 +877,10 @@ $("btn-save-set").onclick = async ()=>{
   s.tGap = +$("t-gap").value || 20;
   try{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
+    /* 註冊禮存全店設定 settings/global */
+    GLOBAL.signupGift = collectSignupGift();
+    await setDoc(doc(db,"settings","global"), { signupGift: GLOBAL.signupGift }, {merge:true});
+    renderSignupGift();
     toast("已儲存（" + cur.n + "）");
   }catch(e){
     console.error("儲存設定失敗", e);

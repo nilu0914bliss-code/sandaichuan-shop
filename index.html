@@ -1117,6 +1117,23 @@ const LEVELS = [
   {n:"滷味宗師", icon:"🍖", need:6000,  rate:2, perks:["點數 2 倍","每月優惠券","新品優先試吃"]},
   {n:"滷味霸主", icon:"👑", need:12000, rate:3, perks:["點數 3 倍","生日豪華禮","專屬活動與隱藏優惠"]}
 ];
+function signupPerks(){
+  const g = (SETTINGS && SETTINGS.signupGift) || {};
+  const birthLine = "記得到會員資料填生日，生日當月訂購享生日優惠";
+  if(g.on === false) return [birthLine];
+  const days = g.days || 3;
+  let giftLine;
+  if(g.type === "coupon"){
+    giftLine = `入會送「${g.cpName||"折價券"}」（折抵 ${g.cpValue||0} 元，領取後 ${days} 天內使用）`;
+  } else if(g.type === "gift"){
+    let name = "贈品";
+    try{ const p = (typeof RAW_PRODUCTS!=="undefined"? RAW_PRODUCTS.flatMap(c=>c.items):[]).find(x=>(x.pid||x.docId)===g.giftPid); if(p) name = p.n; }catch(e){}
+    giftLine = `入會送「${name}」×1（領取後 ${days} 天內使用）`;
+  } else {
+    giftLine = `入會送 ${g.points??30} 點（領取後 ${days} 天內使用）`;
+  }
+  return [giftLine, birthLine];
+}
 function levelOf(spent){
   let lv = LEVELS[0];
   LEVELS.forEach(x=>{ if((spent||0) >= x.need) lv = x; });
@@ -1160,6 +1177,21 @@ function lineAuth(){
 function isBirthMonth(){
   return !!(member && member.birth && (+member.birth.split("-")[1] === new Date().getMonth()+1));
 }
+async function grantSignupGift(uid, m){
+  const g = (SETTINGS && SETTINGS.signupGift) || {};
+  if(g.on === false) {   /* 停用時仍標記，避免每次登入都重試 */
+    if(window.fbSaveMember) await window.fbSaveMember(uid, {signupGifted:true});
+    return;
+  }
+  /* 補上贈品名稱（存進券方便顯示） */
+  if(g.type==="gift" && !g.giftName){
+    try{ const p=(typeof RAW_PRODUCTS!=="undefined"?RAW_PRODUCTS.flatMap(c=>c.items):[]).find(x=>(x.pid||x.docId)===g.giftPid); if(p) g.giftName=p.n; }catch(e){}
+  }
+  if(window.fbGrantSignup){
+    const newPts = await window.fbGrantSignup(uid, g, m.points||0);
+    if(typeof newPts === "number") m.points = newPts;   /* 讓下面 member 用到更新後點數 */
+  }
+}
 window.onMemberLogin = async (uid, m)=>{
   authReady = true;
   const mask = document.getElementById("loading-mask");
@@ -1171,6 +1203,12 @@ window.onMemberLogin = async (uid, m)=>{
     pic: m.pictureUrl || "", count: 0,
     points: m.points || 0, spent: m.spent || 0
   };
+  /* 註冊禮：新會員（未領過）自動發放一次，並標記已領，避免重複 */
+  try{
+    if(!m.signupGifted){
+      await grantSignupGift(uid, m);
+    }
+  }catch(e){ console.error("發放註冊禮失敗", e); }
   await refreshMyOrders();
   await refreshCoupons();
   renderMember();
@@ -1382,10 +1420,13 @@ function renderMemberInner(){
         </div>
         <div class="lv-s" style="margin-top:8px;">已達最高等級，感謝您的支持！</div>`}
       <div id="perks" style="display:none;margin-top:10px;">
-        ${LEVELS.map(x=>`<div class="perk ${x.n===lv.n?"on":""}">
+        ${LEVELS.map(x=>{
+          let perks = x.perks.slice();
+          if(x.n==="初入江湖"){ perks = signupPerks(); }
+          return `<div class="perk ${x.n===lv.n?"on":""}">
           <div class="pk-n">${x.icon} ${x.n}${x.need? "（滿 "+money(x.need)+"）":"（加入會員）"}</div>
-          <div class="pk-l">${x.perks.map(p=>"・"+p).join("<br>")}</div>
-        </div>`).join("")}
+          <div class="pk-l">${perks.map(p=>"・"+p).join("<br>")}</div>
+        </div>`;}).join("")}
       </div>
     </div>
     <div class="stat-card">
@@ -1689,6 +1730,30 @@ if(cfg.apiKey && cfg.projectId){
         return snap.docs.map(x=>({docId:x.id, ...x.data()}))
           .sort((a,b)=> String(a.expire||"").localeCompare(String(b.expire||"")));
       }catch(e){ console.error("讀取優惠券失敗", e); return []; }
+    };
+    /* 發放註冊禮：依設定加點數或發券/贈品，並在會員文件標記 signupGifted，避免重複 */
+    window.fbGrantSignup = async (uid, g, curPoints)=>{
+      const days = g.days || 3;
+      const exp = new Date(); exp.setDate(exp.getDate() + days);
+      const expStr = exp.getFullYear()+"-"+String(exp.getMonth()+1).padStart(2,"0")+"-"+String(exp.getDate()).padStart(2,"0");
+      const memberPatch = { signupGifted: true };
+      if(g.type === "points"){
+        memberPatch.points = (curPoints||0) + (g.points||0);
+      } else if(g.type === "coupon"){
+        await addDoc(collection(db,"usercoupons"), {
+          uid, name: g.cpName||"新會員折價券", type:"amount",
+          value: g.cpValue||0, min: g.cpMin||0, expire: expStr,
+          used:false, source:"signup", createdAt: serverTimestamp()
+        });
+      } else if(g.type === "gift"){
+        await addDoc(collection(db,"usercoupons"), {
+          uid, name:"新會員贈品", type:"gift",
+          giftPid: g.giftPid||"", giftName: g.giftName||"贈品", min:0, expire: expStr,
+          used:false, source:"signup", createdAt: serverTimestamp()
+        });
+      }
+      await setDoc(doc(db,"members",uid), memberPatch, {merge:true});
+      return memberPatch.points;
     };
     window.fbSaveMember = async (uid, data)=>{
       try{ await setDoc(doc(db,"members",uid), data, {merge:true}); }catch(e){ console.error(e); }
