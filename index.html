@@ -1517,18 +1517,28 @@ function openOrder(i){
 function reset(){ cart={}; sauceSel=""; renderMenu(); renderBar(); renderCart(); go("p-menu"); }
 
 /* ══ 自取日期與時段（依現在時間自動排除已過時段） ══ */
-function chTime(){
+function isHolidayDate(d){
+  /* 週六(6)、週日(0) 為假日 */
+  const day = (d instanceof Date)? d.getDay() : new Date(String(d).replace(/-/g,"/")).getDay();
+  return day===0 || day===6;
+}
+function chTime(dateObj){
   const s = MY_CH? chSet(MY_CH) : {};
-  const [sh,sm] = (s.tStart||"06:00").split(":").map(Number);
-  const [eh,em] = (s.tEnd||"12:30").split(":").map(Number);
-  return { start: sh*60+sm, end: eh*60+em, gap: Math.max(5, s.tGap||20) };
+  const holiday = dateObj ? isHolidayDate(dateObj) : false;
+  /* 假日用 tStartH/tEndH/tGapH；沒設定就回退平日值 */
+  const st = holiday ? (s.tStartH || s.tStart || "06:00") : (s.tStart || "06:00");
+  const en = holiday ? (s.tEndH   || s.tEnd   || "12:30") : (s.tEnd   || "12:30");
+  const gp = holiday ? (s.tGapH   || s.tGap   || 20)      : (s.tGap   || 20);
+  const [sh,sm] = st.split(":").map(Number);
+  const [eh,em] = en.split(":").map(Number);
+  return { start: sh*60+sm, end: eh*60+em, gap: Math.max(5, gp||20) };
 }
 const isoLocal = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 const hhmm = x => Math.floor(x/60) + ":" + String(x%60).padStart(2,"0");
 function slotsLeftToday(){
   const now = new Date();
   const cut = now.getHours()*60 + now.getMinutes();
-  const {start, end, gap} = chTime();
+  const {start, end, gap} = chTime(now);
   const out = [];
   for(let t=start; t+gap<=end; t+=gap){ if(t > cut) out.push(t); }
   return out;
@@ -1543,7 +1553,9 @@ function renderSlots(){
   if(!dt || !sel) return;
   const chosen = sel.value;
   const isToday = dt.value === isoLocal(new Date());
-  const {start, end, gap} = chTime();
+  /* 依「選定的取餐日」判斷平日/假日，取對應時段 */
+  const dateObj = dt.value ? new Date(dt.value.replace(/-/g,"/")) : new Date();
+  const {start, end, gap} = chTime(dateObj);
   const list = [];
   for(let t=start; t+gap<=end; t+=gap) list.push(t);
   const avail = isToday? slotsLeftToday() : list;
