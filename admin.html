@@ -772,7 +772,7 @@ function renderSettings(){
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   const s = curSet();
   const note = $("set-note");
-  if(note) note.innerHTML = `目前通路：<b style="color:var(--wine);">${cur.n}</b>　標「<b style="color:var(--wine);">此通路</b>」的設定只影響這個取貨點；標「<b style="color:#B8860B;">全店共用</b>」的（優惠券、註冊禮）三個取貨點一起生效。`;
+  if(note) note.innerHTML = `目前通路：<b style="color:var(--wine);">${cur.n}</b>`;
 
   // 開放接單
   $("lb-open-name").textContent = "開放接單";
