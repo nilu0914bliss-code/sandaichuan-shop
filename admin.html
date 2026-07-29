@@ -266,7 +266,7 @@
       <span class="sw-lb" id="snd-state" style="flex:1;">🔕 點畫面任一處即可開啟提示音</span>
       <button class="btn" style="background:#fff;border:1px solid var(--wine);color:var(--wine);padding:7px 14px;font-size:12.5px;" onclick="testBeep()">測試音效</button>
     </div>
-    <div id="new-alert" onclick="this.style.display='none';todayNewCount=0;" style="display:none;margin:10px 16px 0;background:#C8351F;color:#fff;padding:11px 14px;border-radius:6px;font-size:13.5px;font-weight:700;line-height:1.6;cursor:pointer;">新訂單</div>
+    
     <div class="list" id="list"><div class="empty">載入中…</div></div>
   </div>
 
@@ -1052,11 +1052,7 @@ function onOrders(list){
     const todayFresh = allFresh.filter(o=> o.type==="pickup" && o.pickup && o.pickup.date===t);
     if(todayFresh.length){
       beep();
-      // 累計今天進來的新單數，避免「連續下單只顯示 1 張」（後一次蓋掉前一次）
-      todayNewCount += todayFresh.length;
       const n = todayFresh[todayFresh.length-1];
-      $("new-alert").innerHTML = `🔔 今日新訂單 ${todayNewCount} 張：最新 ${n.orderNo||""} ${n.name||""}（${n.pickup.market} ${n.pickup.slot||""}）`;
-      $("new-alert").style.display = "block";
       // 自動印：把新單丟進緩衝佇列，2.5 秒後一次打包成多頁 PDF 下載，交給 AutoPrint 印。
       // 為什麼要緩衝：同時／接連下單時，若一張張下載，瀏覽器會擋掉第 2 個之後的下載而漏單。
       // 收集成一份 PDF、只下載一次，就不會被擋，也不會漏。
