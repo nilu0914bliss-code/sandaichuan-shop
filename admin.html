@@ -17,6 +17,9 @@
   .scard-h{display:flex;align-items:center;gap:10px;padding:14px;cursor:pointer;user-select:none;}
   .scard-h .ic{font-style:normal;font-size:16px;width:22px;text-align:center;}
   .scard-h .t{flex:1;font-size:14.5px;font-weight:700;letter-spacing:1px;}
+  .scope-tag{font-size:10.5px;font-weight:700;letter-spacing:0;padding:2px 7px;border-radius:10px;margin-left:7px;vertical-align:middle;white-space:nowrap;}
+  .scope-ch{background:#F3E9DA;color:#8a5a2a;}
+  .scope-all{background:#FBF0D0;color:#B8860B;}
   .scard-h .sbadge{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;background:#EFE7E4;color:var(--ink-soft);}
   .scard-h .sbadge.on{background:#E7F0E2;color:#5A7A48;}
   .scard-h .arr{color:var(--ink-soft);font-size:11px;transition:transform .2s;}
@@ -274,7 +277,7 @@
       <!-- 開放接單 -->
       <div class="scard open" id="sc-open">
         <div class="scard-h" onclick="toggleCard('sc-open',event)">
-          <i class="ic">🟢</i><span class="t" id="lb-open-name">開放接單</span>
+          <i class="ic">🟢</i><span class="t" id="lb-open-name">開放接單</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-open"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -286,7 +289,7 @@
       <!-- 取餐時段 -->
       <div class="scard open" id="sc-time">
         <div class="scard-h" onclick="toggleCard('sc-time',event)">
-          <i class="ic">🕐</i><span class="t">取餐時段</span>
+          <i class="ic">🕐</i><span class="t">取餐時段</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-time"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -313,7 +316,7 @@
       <!-- 公休日（預設收起） -->
       <div class="scard" id="sc-off">
         <div class="scard-h" onclick="toggleCard('sc-off',event)">
-          <i class="ic">📅</i><span class="t">公休日</span>
+          <i class="ic">📅</i><span class="t">公休日</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-off"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner" id="off-block">
@@ -330,7 +333,7 @@
       <!-- 首頁公告（預設收起） -->
       <div class="scard" id="sc-ann">
         <div class="scard-h" onclick="toggleCard('sc-ann',event)">
-          <i class="ic">📢</i><span class="t">首頁公告</span>
+          <i class="ic">📢</i><span class="t">首頁公告</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-ann"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -351,7 +354,7 @@
       <!-- 優惠券（預設收起） -->
       <div class="scard" id="sc-cp">
         <div class="scard-h" onclick="toggleCard('sc-cp',event)">
-          <i class="ic">🎟</i><span class="t">優惠券</span>
+          <i class="ic">🎟</i><span class="t">優惠券</span><span class="scope-tag scope-all">全店共用</span>
           <span class="sbadge" id="badge-cp"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -407,7 +410,7 @@
       <!-- 註冊禮（新會員加入時自動發放） -->
       <div class="scard" id="sc-signup">
         <div class="scard-h" onclick="toggleCard('sc-signup',event)">
-          <i class="ic">🎁</i><span class="t">註冊禮</span>
+          <i class="ic">🎁</i><span class="t">註冊禮</span><span class="scope-tag scope-all">全店共用</span>
           <span class="sbadge" id="badge-signup"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -460,7 +463,7 @@
       <!-- 線上付款（各通路獨立） -->
       <div class="scard" id="sc-pay">
         <div class="scard-h" onclick="toggleCard('sc-pay',event)">
-          <i class="ic">💳</i><span class="t">線上付款</span>
+          <i class="ic">💳</i><span class="t">線上付款</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-pay"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
@@ -769,7 +772,7 @@ function renderSettings(){
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   const s = curSet();
   const note = $("set-note");
-  if(note) note.innerHTML = `目前通路：<b style="color:var(--wine);">${cur.n}</b>　所有設定只影響這個通路。`;
+  if(note) note.innerHTML = `目前通路：<b style="color:var(--wine);">${cur.n}</b>　標「<b style="color:var(--wine);">此通路</b>」的設定只影響這個取貨點；標「<b style="color:#B8860B;">全店共用</b>」的（優惠券、註冊禮）三個取貨點一起生效。`;
 
   // 開放接單
   $("lb-open-name").textContent = "開放接單";
