@@ -693,6 +693,10 @@ function nav(t){
 }
 /* 店家設定：從資料庫 settings/shop 載入；載入前用保守預設（僅自取＋現金） */
 let SETTINGS = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[] };
+/* 設定載入完成的信號：發放註冊禮前要等它，避免讀到舊/空設定而發錯 */
+let _settingsReadyResolve;
+const settingsReady = new Promise(res => { _settingsReadyResolve = res; });
+function markSettingsReady(){ if(_settingsReadyResolve){ _settingsReadyResolve(); _settingsReadyResolve = null; } }
 function isClosed(d){
   const s = MY_CH? chSet(MY_CH) : {};
   return (s.offDates||[]).includes(isoLocal(d));
@@ -1179,7 +1183,13 @@ function isBirthMonth(){
 }
 async function grantSignupGift(uid, m){
   const g = (SETTINGS && SETTINGS.signupGift) || {};
-  if(g.on === false) {   /* 停用時仍標記，避免每次登入都重試 */
+  /* 安全防呆：設定還沒載入好（讀不到 type）時，先不要動作、也不要蓋已領章，
+     這樣下次登入還會再試，避免「標記已領卻沒發」的慘況 */
+  if(!g || !g.type){
+    console.warn("註冊禮設定尚未載入，這次不發放也不標記，待下次登入重試");
+    return;
+  }
+  if(g.on === false) {   /* 明確停用時才標記，避免每次登入都重試 */
     if(window.fbSaveMember) await window.fbSaveMember(uid, {signupGifted:true});
     return;
   }
@@ -1206,6 +1216,7 @@ window.onMemberLogin = async (uid, m)=>{
   /* 註冊禮：新會員（未領過）自動發放一次，並標記已領，避免重複 */
   try{
     if(!m.signupGifted){
+      await settingsReady;   /* 先確保 signupGift 設定已從 Firebase 載入，避免發錯 */
       await grantSignupGift(uid, m);
     }
   }catch(e){ console.error("發放註冊禮失敗", e); }
@@ -1678,13 +1689,14 @@ if(cfg.apiKey && cfg.projectId){
         console.log("通路", c.k, "讀到 open =", cs.exists()? cs.data().open : "(文件不存在)");
       }
       applyShopSettings(Object.assign({}, g.exists()? g.data():{}, {ch: chMap}));
+      markSettingsReady();   /* 設定（含 signupGift）已從 Firebase 載入，發放註冊禮可安全進行 */
       renderChList();
       if(MY_CH && !chOpen(MY_CH)){
         alert("此取貨點目前暫停接單，請改選其他取貨點。");
         MY_CH = ""; try{ localStorage.removeItem("sdc_ch"); }catch(e){}
         go("p-pickch");
       } else if(MY_CH){ syncChBar(); rebuildProducts(); }
-    }catch(e){ console.error("讀取店家設定失敗", e); }
+    }catch(e){ console.error("讀取店家設定失敗", e); markSettingsReady(); }
     // ── LINE 回呼處理 ──
     const qs = new URLSearchParams(location.search);
     const lineCode = qs.get("code");
@@ -1745,25 +1757,35 @@ if(cfg.apiKey && cfg.projectId){
     };
     /* 發放註冊禮：依設定加點數或發券/贈品，並在會員文件標記 signupGifted，避免重複 */
     window.fbGrantSignup = async (uid, g, curPoints)=>{
+      /* 防呆：type 不是有效值就完全不動作、不蓋章，避免標記已領卻沒發 */
+      if(!g || !["points","coupon","gift"].includes(g.type)){
+        console.warn("fbGrantSignup：無效的註冊禮類型，跳過", g);
+        return undefined;
+      }
       const days = g.days || 3;
       const exp = new Date(); exp.setDate(exp.getDate() + days);
       const expStr = exp.getFullYear()+"-"+String(exp.getMonth()+1).padStart(2,"0")+"-"+String(exp.getDate()).padStart(2,"0");
       const memberPatch = { signupGifted: true };
+      let granted = false;
       if(g.type === "points"){
         memberPatch.points = (curPoints||0) + (g.points||0);
+        granted = true;
       } else if(g.type === "coupon"){
         await addDoc(collection(db,"usercoupons"), {
           uid, name: g.cpName||"新會員折價券", type:"amount",
           value: g.cpValue||0, min: g.cpMin||0, expire: expStr,
           used:false, source:"signup", createdAt: serverTimestamp()
         });
+        granted = true;
       } else if(g.type === "gift"){
         await addDoc(collection(db,"usercoupons"), {
           uid, name:"新會員贈品", type:"gift",
           giftPid: g.giftPid||"", giftName: g.giftName||"贈品", min:0, expire: expStr,
           used:false, source:"signup", createdAt: serverTimestamp()
         });
+        granted = true;
       }
+      if(!granted) return undefined;   /* 沒發成功就不蓋章 */
       await setDoc(doc(db,"members",uid), memberPatch, {merge:true});
       return memberPatch.points;
     };
