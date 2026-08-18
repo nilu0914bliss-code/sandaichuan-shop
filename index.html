@@ -1153,8 +1153,12 @@ function showAuthLoading(){
   const el = $("login-loading");
   if(el) el.style.display = "block";
   const e2 = $("line-entry"); if(e2) e2.style.display = "none";
+  /* 保險：8 秒內若登入狀態仍未還原，收掉轉圈、跳出登入鈕，避免卡死 */
+  try{ clearTimeout(window._authWait); }catch(e){}
+  window._authWait = setTimeout(function(){ if(!authReady) hideAuthLoading(); }, 8000);
 }
 function hideAuthLoading(){
+  try{ clearTimeout(window._authWait); }catch(e){}
   const el = $("login-loading");
   if(el) el.style.display = "none";
   const e2 = $("line-entry"); if(e2) e2.style.display = "block";
@@ -1678,7 +1682,8 @@ if(cfg.apiKey && cfg.projectId){
       RAW_PRODUCTS = list;
       rebuildProducts();
     }
-    try{
+    /* 設定改為背景載入，不阻擋後面的「登入狀態監聽」啟動（避免手機卡在「登入狀態確認中」）*/
+    (async()=>{ try{
       const g = await getDoc(doc(db, "settings", "global"));
       const chMap = {};
       for(const c of CH){
@@ -1696,7 +1701,7 @@ if(cfg.apiKey && cfg.projectId){
         MY_CH = ""; try{ localStorage.removeItem("sdc_ch"); }catch(e){}
         go("p-pickch");
       } else if(MY_CH){ syncChBar(); rebuildProducts(); }
-    }catch(e){ console.error("讀取店家設定失敗", e); markSettingsReady(); }
+    }catch(e){ console.error("讀取店家設定失敗", e); markSettingsReady(); } })();
     // ── LINE 回呼處理 ──
     const qs = new URLSearchParams(location.search);
     const lineCode = qs.get("code");
