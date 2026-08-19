@@ -500,12 +500,20 @@ if(!cfg.apiKey){ document.body.innerHTML = "<p style='padding:40px;text-align:ce
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
 const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-const { getFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction, getDocs, addDoc, deleteDoc } =
+const { getFirestore, initializeFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction, getDocs, addDoc, deleteDoc } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
 
 const app = initializeApp(cfg);
 const auth = getAuth(app);
-const db = getFirestore(app);
+/* 手機／行動網路常會擋掉 Firestore 預設的 WebChannel 串流連線，整批讀取就會失敗（例如會員名單變成 0 位）。
+   開啟自動偵測長輪詢：連得上時照走原本的串流，連不上才自動改用長輪詢。桌機行為不變。 */
+let db;
+try{
+  db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+}catch(e){
+  console.warn("initializeFirestore 失敗，回退預設連線", e);
+  db = getFirestore(app);
+}
 
 /* ── 登入狀態 ── */
 onAuthStateChanged(auth, user=>{
@@ -592,12 +600,38 @@ function renderCpCh(){
   const el = $("cp-scope");
   if(el) el.innerHTML = `發送的券<b>三個取貨點都能使用</b>。<br>優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。`;
 }
-async function loadMembers(){
+/* 會員名單原本只讀一次，失敗就永遠是空的、畫面上看起來像「0 位會員」，
+   而且錯誤只進 console，手機上根本看不到。改成會重試、會顯示失敗、可手動重讀。 */
+let MEMBERS_OK = false;      // 這一輪是否成功讀到會員
+let MEMBERS_LOADING = false; // 避免同時發出多次讀取
+async function loadMembers(tries){
+  if(MEMBERS_LOADING) return;
+  MEMBERS_LOADING = true;
+  const max = tries || 3;
   try{
-    const snap = await getDocs(collection(db,"members"));
-    MEMBERS_CACHE = snap.docs.map(d=>({uid:d.id, ...d.data()}));
-  }catch(e){ console.error("讀取會員失敗", e); MEMBERS_CACHE = []; }
+    for(let i=1; i<=max; i++){
+      try{
+        const snap = await getDocs(collection(db,"members"));
+        MEMBERS_CACHE = snap.docs.map(d=>({uid:d.id, ...d.data()}));
+        MEMBERS_OK = true;
+        return;
+      }catch(e){
+        console.error("讀取會員失敗（第 "+i+" 次）", e);
+        MEMBERS_OK = false;
+        if(i < max) await new Promise(r=>setTimeout(r, i*1500)); // 1.5s、3s 後再試
+      }
+    }
+    MEMBERS_CACHE = [];
+  } finally {
+    MEMBERS_LOADING = false;
+  }
 }
+/* 手動重讀（讀取失敗時畫面上的「重試」用） */
+window.reloadMembers = async ()=>{
+  const el = $("cp-count"); if(el) el.textContent = "重新讀取中…";
+  await loadMembers();
+  countTargets();
+};
 function targetMembers(){
   const t = $("cp-target").value;
   const mth = new Date().getMonth()+1;
@@ -612,6 +646,15 @@ function targetMembers(){
   });
 }
 window.countTargets = ()=>{
+  /* 讀取失敗時不要假裝「沒有會員」——那會讓人以為真的 0 位。明講讀失敗並給重試。 */
+  if(!MEMBERS_OK){
+    $("cp-count").innerHTML = `<span style="color:#C8351F;">會員名單讀取失敗（可能是網路不穩）</span>
+      <button type="button" onclick="reloadMembers()"
+        style="margin-left:8px;padding:2px 10px;border:1px solid #C8351F;background:#fff;color:#C8351F;border-radius:6px;font-size:12px;">重試</button>`;
+    $("cp-send").textContent = "會員名單讀取失敗";
+    $("cp-send").disabled = true;
+    return;
+  }
   const n = targetMembers().length;
   $("cp-count").innerHTML = `目前符合條件：<b>${n}</b> 位會員`;
   $("cp-send").textContent = n? `發 送 給 ${n} 位 會 員` : "沒有符合條件的會員";
@@ -1084,7 +1127,14 @@ function startData(){
       <span style="font-size:11.5px;">${err.message||""}</span><br><br>
       登入帳號<br><b style="color:var(--wine);font-size:13px;">${who}</b></div>`;
   });
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refetch(); });
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden) return;
+    refetch();
+    /* 會員名單上次沒讀成功就趁機補讀（手機常見：切出去接個電話再切回來就好了） */
+    if(!MEMBERS_OK) loadMembers().then(countTargets);
+  });
+  /* 網路從斷線恢復時，也補讀一次會員名單 */
+  window.addEventListener("online", ()=>{ if(!MEMBERS_OK) loadMembers().then(countTargets); });
   setInterval(()=>{ if(!document.hidden && openSet.size===0) refetch(); }, 5000);
   loadMenu();
   loadSettings();
