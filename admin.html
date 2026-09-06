@@ -1863,6 +1863,21 @@ async function menuDrop(e, idx){
 window.menuDragStart=menuDragStart; window.menuDragOver=menuDragOver; window.menuDragEnd=menuDragEnd; window.menuDrop=menuDrop;
 
 function editName(idx, val){ nameEdits["n-"+idx] = val; }
+/* 商品介紹：三通路共用，存在 products 的 desc 欄位（跟品名、照片一樣） */
+function editDesc(idx, val){
+  nameEdits["d-"+idx] = val;
+  const c = $("desccnt-"+idx);
+  if(c) c.textContent = val.length;
+}
+async function saveDesc(idx){
+  const val = nameEdits["d-"+idx];
+  if(val === undefined) return;
+  const p = PRODUCTS[idx];
+  if(val.trim() === (p.desc||"").trim()){ delete nameEdits["d-"+idx]; return; }
+  try{ await updateDoc(doc(db,"products",p.docId), {desc: val.trim().slice(0,60)}); toast("商品介紹已更新"); }
+  catch(e){ console.error(e); alert("介紹儲存失敗：" + (e.message||"")); }
+  delete nameEdits["d-"+idx];
+}
 async function saveName(idx){
   const val = nameEdits["n-"+idx];
   if(val === undefined) return;
@@ -1958,6 +1973,7 @@ async function moveItem(idx, dir){
   }catch(err){ console.error(err); alert("排序儲存失敗：" + (err.message||"")); }
 }
 window.editName=editName; window.saveName=saveName; window.editVarName=editVarName; window.saveVarName=saveVarName;
+window.editDesc=editDesc; window.saveDesc=saveDesc;
 window.addVar=addVar; window.delVar=delVar; window.addItem=addItem; window.delItem=delItem;
 window.moveItem=moveItem;
 
@@ -2008,6 +2024,14 @@ function renderMenu(){
               <div class="hint" style="margin:0;">點左側方框上傳商品照片（三通路共用）<br>建議正方形、主體置中</div>
               ${p.photo? `<button class="btn" style="margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="event.stopPropagation();removePhoto(${idx})">移除照片</button>`:""}
             </div>
+          </div>
+          <div style="margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);">
+            <label style="display:block;font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:5px;">商品介紹</label>
+            <textarea id="desc-${idx}" maxlength="60" placeholder="例：選用溫體放山土雞，以海鹽與蔥薑低溫慢浸，肉質緊實不柴。"
+              oninput="editDesc(${idx}, this.value)" onblur="saveDesc(${idx})"
+              style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#FCFAF3;resize:vertical;min-height:56px;line-height:1.55;">${(p.desc||"").replace(/</g,"&lt;")}</textarea>
+            <div class="hint" style="text-align:right;margin:3px 0 0;"><span id="desccnt-${idx}">${(p.desc||"").length}</span> / 60 字</div>
+            <div class="hint" style="margin:2px 0 0;">留空就不會顯示在客人的點餐頁。三個通路共用（跟品名、照片一樣）。</div>
           </div>
           ${cur.type==="pickup" ? `
           <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">

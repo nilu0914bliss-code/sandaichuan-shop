@@ -54,6 +54,7 @@
   .ph-img{width:84px;height:84px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--line);}
   .item::before{content:"";position:absolute;inset:4px;border:1px solid var(--line);border-radius:4px;pointer-events:none;opacity:.55;}
   .item .name{font-size:15.5px;font-weight:700;letter-spacing:1px;}
+  .item .pdesc{font-size:12px;color:var(--ink-soft);line-height:1.55;margin-top:4px;white-space:pre-wrap;}
   .item .note{font-size:12px;color:var(--ink-soft);margin-top:2px;}
   .vrow{display:flex;align-items:center;gap:8px;margin-top:9px;position:relative;}
   .vrow .vlabel{flex:1;font-size:13.5px;color:var(--ink);}
@@ -555,7 +556,7 @@ function rebuildProducts(){
     items: c.items.map(p=>{
       const cd = (p.ch && p.ch[k]) || {};
       return {
-        id: p.pid, n: p.n, img: p.photo||"",
+        id: p.pid, n: p.n, img: p.photo||"", desc: p.desc||"",
         sold: cd.on === false,
         limit: (cd.limit===undefined||cd.limit===null)? null : cd.limit,
         vars: (p.vars||[]).map((v,vi)=>({
@@ -604,6 +605,7 @@ function renderMenu(){
           : `<div class="ph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="12" cy="13" rx="9" ry="5.5"/><ellipse cx="12" cy="12" rx="6" ry="3.4"/></svg>照片準備中</div>`}
         <div class="main">
         <div class="name">${it.n}${it.sold? `<span class="sold-tag">本處售完</span>`:""}</div>
+        ${it.desc? `<div class="pdesc">${it.desc.replace(/</g,"&lt;")}</div>` : ""}
         ${it.vars.map((va,vi)=>{
           const k=keyOf(it.id,vi), q=cart[k]||0;
           return `<div class="vrow">
