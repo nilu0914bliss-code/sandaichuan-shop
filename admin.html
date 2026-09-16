@@ -2400,31 +2400,7 @@ $("btn-save-menu").onclick = async ()=>{
     toast(`已儲存 ${ok} 個品項（${cur.n}）`);
   }
 };
-</script>
-</body>
-</html>
-+r.minSpend+' 可用':''}</div>
-    <div class="rd-sub">拿到後 ${r.days||30} 天內使用</div></div>
-    <button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delRedeemItem(${i})">刪除</button></div>`).join('');
-}
-window.delRedeemItem=function(i){ REDEEM_CATALOG.splice(i,1); renderRedeemList(); };
-window.addRedeemItem=function(){
-  const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),
-        val=num("rd-value"),min=num("rd-min"),days=num("rd-days")||30;
-  if(!pts||!name||!val){ alert("請填寫所需點數、券名稱、折抵金額"); return; }
-  REDEEM_CATALOG.push({pts,name,value:val,minSpend:min,days});
-  REDEEM_CATALOG.sort((a,b)=>a.pts-b.pts);
-  ["rd-pts","rd-name","rd-value","rd-min"].forEach(id=>{ const el=$(id); if(el) el.value=""; }); setV("rd-days",30);
-  renderRedeemList();
-};
-window.saveRedeemCatalog=async function(){
-  try{ await setDoc(doc(db,"settings","global"),{redeemCatalog:REDEEM_CATALOG},{merge:true});
-    GLOBAL.redeemCatalog=REDEEM_CATALOG; toast("點數兌換目錄已儲存");
-  }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
-};
 
-/* 靈魂滷汁 */
-let SAUCES=[];
 function renderSaucesList(){
   const el=$("sauces-list"); if(!el) return;
   el.innerHTML=SAUCES.map(function(s,i){
@@ -2667,6 +2643,7 @@ $("btn-save-menu").onclick = async ()=>{
     toast(`已儲存 ${ok} 個品項（${cur.n}）`);
   }
 };
+
 </script>
 </body>
 </html>
