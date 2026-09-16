@@ -2224,11 +2224,34 @@ if($("pr-pts")) $("pr-pts").addEventListener("input",updatePrPreview);
 
 /* 點數兌換目錄 */
 let REDEEM_CATALOG=[];
+/* HTML 跳脫輔助 */
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
 function renderRedeemList(){
   const el=$("redeem-list"); if(!el) return;
   if(!REDEEM_CATALOG.length){ el.innerHTML='<div class="hint">尚未設定任何兌換選項。</div>'; return; }
-  el.innerHTML=REDEEM_CATALOG.map((r,i)=>`<div class="rd-row"><div class="rd-pts">${r.pts} 點</div>
-    <div class="rd-body"><div>${esc(r.name)}${r.minSpend?' · 滿 
+  el.innerHTML=REDEEM_CATALOG.map(function(r,i){
+    return '<div class="rd-row"><div class="rd-pts">'+r.pts+' 點</div>'
+      +'<div class="rd-body"><div>'+esc(r.name)+(r.minSpend?' · 滿 $'+r.minSpend+' 可用':'')+'</div>'
+      +'<div class="rd-sub">拿到後 '+(r.days||30)+' 天內使用</div></div>'
+      +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delRedeemItem('+i+')">刪除</button></div>';
+  }).join('');
+}
+window.delRedeemItem=function(i){ REDEEM_CATALOG.splice(i,1); renderRedeemList(); };
+window.addRedeemItem=function(){
+  const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),
+        val=num("rd-value"),min=num("rd-min"),days=num("rd-days")||30;
+  if(!pts||!name||!val){ alert("請填寫所需點數、券名稱、折抵金額"); return; }
+  REDEEM_CATALOG.push({pts,name,value:val,minSpend:min,days});
+  REDEEM_CATALOG.sort(function(a,b){return a.pts-b.pts;});
+  ["rd-pts","rd-name","rd-value","rd-min"].forEach(function(id){ var el=$(id); if(el) el.value=""; }); setV("rd-days",30);
+  renderRedeemList();
+};
+window.saveRedeemCatalog=async function(){
+  try{ await setDoc(doc(db,"settings","global"),{redeemCatalog:REDEEM_CATALOG},{merge:true});
+    GLOBAL.redeemCatalog=REDEEM_CATALOG; toast("點數兌換目錄已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
+};
 window.addVar=addVar; window.delVar=delVar; window.addItem=addItem; window.delItem=delItem;
 window.moveItem=moveItem;
 
@@ -2404,11 +2427,13 @@ window.saveRedeemCatalog=async function(){
 let SAUCES=[];
 function renderSaucesList(){
   const el=$("sauces-list"); if(!el) return;
-  el.innerHTML=SAUCES.map((s,i)=>`<div class="sauce-row">
-    <input value="${esc(s)}" onchange="SAUCES[${i}]=this.value"
-      style="flex:1;border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-family:inherit;font-size:13px;background:#FCFAF3;">
-    <button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delSauce(${i})">刪除</button>
-  </div>`).join('');
+  el.innerHTML=SAUCES.map(function(s,i){
+    return '<div class="sauce-row">'
+      +'<input value="'+esc(s)+'" onchange="SAUCES['+i+']=this.value"'
+      +' style="flex:1;border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-family:inherit;font-size:13px;background:#FCFAF3;">'
+      +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delSauce('+i+')">刪除</button>'
+      +'</div>';
+  }).join('');
 }
 window.delSauce=function(i){ SAUCES.splice(i,1); renderSaucesList(); };
 window.addSauce=function(){
@@ -2434,16 +2459,18 @@ function renderReferral(){
 let LEVELS_EDIT=[];
 function renderLevelsList(){
   const el=$("levels-list"); if(!el) return;
-  el.innerHTML=LEVELS_EDIT.map((lv,i)=>`<div class="lv-card">
-    <div class="lv-badge">${esc(lv.name)} · ${lv.minPts} 點起</div>
-    <div class="cp-fld"><label>等級名稱</label>
-      <input value="${esc(lv.name)}" onchange="LEVELS_EDIT[${i}].name=this.value;renderLevelsList()"></div>
-    ${i>0?`<div class="cp-fld"><label>升級門檻（累積點數）</label>
-      <input type="number" value="${lv.minPts}" min="1" onchange="LEVELS_EDIT[${i}].minPts=+this.value"></div>`:""}
-    <div class="cp-fld"><label>福利說明（客人會員頁顯示）</label>
-      <textarea rows="2" onchange="LEVELS_EDIT[${i}].perks=this.value">${esc(lv.perks||"")}</textarea></div>
-    ${i>0?`<div style="text-align:right;"><button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;" onclick="delLevel(${i})">刪除此等級</button></div>`:""}
-  </div>`).join('');
+  el.innerHTML=LEVELS_EDIT.map(function(lv,i){
+    var h='<div class="lv-card">'
+      +'<div class="lv-badge">'+esc(lv.name)+' · '+lv.minPts+' 點起</div>'
+      +'<div class="cp-fld"><label>等級名稱</label>'
+      +'<input value="'+esc(lv.name)+'" onchange="LEVELS_EDIT['+i+'].name=this.value;renderLevelsList()"></div>';
+    if(i>0) h+='<div class="cp-fld"><label>升級門檻（累積點數）</label>'
+      +'<input type="number" value="'+lv.minPts+'" min="1" onchange="LEVELS_EDIT['+i+'].minPts=+this.value"></div>';
+    h+='<div class="cp-fld"><label>福利說明（客人會員頁顯示）</label>'
+      +'<textarea rows="2" onchange="LEVELS_EDIT['+i+'].perks=this.value">'+esc(lv.perks||"")+'</textarea></div>';
+    if(i>0) h+='<div style="text-align:right;"><button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;" onclick="delLevel('+i+')">刪除此等級</button></div>';
+    return h+'</div>';
+  }).join('');
 }
 window.addLevel=function(){ LEVELS_EDIT.push({name:"新等級",minPts:100,perks:""}); renderLevelsList(); };
 window.delLevel=function(i){ LEVELS_EDIT.splice(i,1); renderLevelsList(); };
