@@ -199,6 +199,18 @@
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;
     padding:10px 22px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:99;letter-spacing:1px;white-space:nowrap;}
   .toast.show{opacity:.92;}
+  .set-group-title{font-size:11px;font-weight:800;letter-spacing:2px;padding:6px 10px 5px;border-radius:5px;margin:14px 0 4px;}
+  .set-group-title.scope-ch{background:var(--cream-soft);color:var(--wine);border-left:3px solid var(--wine);}
+  .set-group-title.scope-all{background:#E9EFE2;color:#3A6A30;border-left:3px solid var(--green);}
+  .rd-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--cream-soft);}
+  .rd-row:last-child{border:none;}
+  .rd-pts{min-width:52px;text-align:center;background:var(--cream-soft);border-radius:5px;padding:4px 6px;font-size:12px;font-weight:800;color:var(--wine);}
+  .rd-body{flex:1;font-size:12.5px;}
+  .rd-sub{font-size:11px;color:var(--ink-soft);}
+  .sauce-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--cream-soft);}
+  .sauce-row:last-child{border:none;}
+  .lv-card{background:var(--cream-soft);border-radius:7px;padding:10px 12px;margin-bottom:9px;}
+  .lv-badge{display:inline-block;background:var(--cream);border:1px solid var(--line);border-radius:5px;padding:3px 9px;font-size:12px;font-weight:800;color:var(--wine);margin-bottom:8px;}
 
   /* ───── 電腦模式（寬版）：只在 body.wide-mode 時生效，平板模式維持原樣 ───── */
   body.wide-mode{max-width:1180px;margin:0 auto;}
@@ -301,6 +313,9 @@
   <div class="view" id="v-set">
     <div class="m-wrap">
       <div class="ch-note" id="set-note"></div>
+
+      <!-- ═══ 此通路 ═══ -->
+      <div class="set-group-title scope-ch" style="grid-column:1/-1;">📍 此通路設定</div>
 
       <!-- 開放接單 -->
       <div class="scard open" id="sc-open">
@@ -415,7 +430,18 @@
               <input type="number" id="cp-gmin" min="0" value="0"></div>
           </div>
 
-          <div class="cp-fld"><label>有效期限</label><input type="date" id="cp-exp"></div>
+          <div class="cp-fld"><label>有效期限設定</label>
+            <div style="display:flex;gap:8px;margin-bottom:6px;">
+              <button class="seg-b on" id="cp-exp-mode-date" onclick="setCpExpMode('date')">固定日期</button>
+              <button class="seg-b" id="cp-exp-mode-days" onclick="setCpExpMode('days')">拿到後 N 天</button>
+            </div>
+            <div id="cp-exp-date-wrap"><input type="date" id="cp-exp"></div>
+            <div id="cp-exp-days-wrap" style="display:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:13px;color:var(--ink-soft);">拿到後</span>
+              <input type="number" id="cp-exp-days" value="30" min="1" style="width:70px;">
+              <span style="font-size:13px;color:var(--ink-soft);">天內使用完畢</span>
+            </div>
+          </div>
 
           <div class="cp-fld"><label>發送對象</label>
             <select id="cp-target" onchange="countTargets()">
@@ -500,7 +526,127 @@
         </div></div>
       </div>
 
-      <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;">儲存設定</button>
+
+      <!-- ═══ 全店共用 ═══ -->
+      <div class="set-group-title scope-all" style="grid-column:1/-1;">🌐 全店共用設定</div>
+
+      <div class="scard" id="sc-pointrule">
+        <div class="scard-h" onclick="toggleCard('sc-pointrule',event)">
+          <i class="ic">🪙</i><span class="t">消費點數規則</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">客人每消費指定金額就累積點數，點數只能用來兌換優惠券，不能直接折抵金額。</div>
+          <div class="sw-row"><span class="l">開啟消費送點數</span><button class="switch" id="sw-pointrule"></button></div>
+          <div id="pointrule-wrap" style="margin-top:10px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:13px;color:var(--ink);">每消費</span>
+              <input type="number" id="pr-spend" min="1" value="100" style="width:80px;">
+              <span style="font-size:13px;color:var(--ink);">元，送</span>
+              <input type="number" id="pr-pts" min="1" value="1" style="width:64px;">
+              <span style="font-size:13px;color:var(--ink);">點</span>
+            </div>
+            <div class="hint" id="pr-preview" style="margin-top:8px;"></div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="scard" id="sc-redeem">
+        <div class="scard-h" onclick="toggleCard('sc-redeem',event)">
+          <i class="ic">🎟</i><span class="t">點數兌換目錄</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">客人在會員頁可以用點數自選兌換的優惠券。每張券可設「拿到後 N 天內使用完」。</div>
+          <div id="redeem-list"></div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);">
+            <div style="font-size:12px;font-weight:800;color:var(--wine);margin-bottom:8px;">＋ 新增兌換選項</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
+              <input type="number" id="rd-pts" placeholder="所需點數" style="width:90px;">
+              <input id="rd-name" placeholder="券名稱（例：折價券 $50）" style="flex:1;min-width:130px;">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:7px;">
+              <input type="number" id="rd-value" placeholder="折抵金額" style="width:90px;">
+              <span style="font-size:12px;color:var(--ink-soft);">元・門檻</span>
+              <input type="number" id="rd-min" placeholder="0" style="width:80px;">
+              <span style="font-size:12px;color:var(--ink-soft);">元・拿到後</span>
+              <input type="number" id="rd-days" value="30" style="width:60px;">
+              <span style="font-size:12px;color:var(--ink-soft);">天到期</span>
+            </div>
+            <div style="text-align:right;"><button class="btn btn-sm" onclick="addRedeemItem()">新增</button></div>
+          </div>
+          <div style="text-align:right;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;">
+            <button class="btn btn-sm" onclick="saveRedeemCatalog()">儲存目錄</button>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="scard" id="sc-levels">
+        <div class="scard-h" onclick="toggleCard('sc-levels',event)">
+          <i class="ic">🏅</i><span class="t">會員等級設定</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">等級名稱與福利說明顯示在客人的會員頁。升級由系統依累積點數自動判斷。</div>
+          <div id="levels-list"></div>
+          <div style="text-align:right;margin-top:10px;">
+            <button class="btn btn-sm" onclick="addLevel()">＋ 新增等級</button>
+            <button class="btn btn-sm" style="margin-left:8px;" onclick="saveLevels()">儲存等級</button>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="scard" id="sc-referral">
+        <div class="scard-h" onclick="toggleCard('sc-referral',event)">
+          <i class="ic">🤝</i><span class="t">邀請好友</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">開啟後，每位會員有唯一邀請碼（系統隨機產生，不含個人資訊）。好友用邀請碼首次下單後，雙方各得一張優惠券。</div>
+          <div class="sw-row"><span class="l">開啟邀請好友功能</span><button class="switch" id="sw-referral"></button></div>
+          <div id="referral-wrap" style="margin-top:10px;">
+            <div class="cp-fld"><label>邀請人（舊會員）可得</label>
+              <input id="ref-inviter-name" placeholder="例：折價券 $50・滿 $200 可用"></div>
+            <div style="display:flex;gap:8px;">
+              <div class="cp-fld" style="flex:1;"><label>折抵金額</label>
+                <input type="number" id="ref-inviter-val" value="50" min="0"></div>
+              <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                <input type="number" id="ref-inviter-min" value="200" min="0"></div>
+            </div>
+            <div class="cp-fld"><label>受邀人（新會員）可得</label>
+              <input id="ref-invitee-name" placeholder="例：折價券 $30・滿 $150 可用"></div>
+            <div style="display:flex;gap:8px;">
+              <div class="cp-fld" style="flex:1;"><label>折抵金額</label>
+                <input type="number" id="ref-invitee-val" value="30" min="0"></div>
+              <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                <input type="number" id="ref-invitee-min" value="150" min="0"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:13px;color:var(--ink);">雙方優惠券：拿到後</span>
+              <input type="number" id="ref-days" value="30" style="width:64px;">
+              <span style="font-size:13px;color:var(--ink);">天內到期</span>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="scard" id="sc-sauces">
+        <div class="scard-h" onclick="toggleCard('sc-sauces',event)">
+          <i class="ic">🫙</i><span class="t">靈魂滷汁選項</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">客人結帳時看到的滷汁選項，可改名、刪除、新增。</div>
+          <div id="sauces-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <input id="sauce-new" placeholder="新滷汁名稱" style="flex:1;min-width:110px;">
+            <button class="btn btn-sm" onclick="addSauce()">＋ 新增</button>
+            <button class="btn btn-sm" onclick="saveSauces()">儲存</button>
+          </div>
+        </div></div>
+      </div>
+
+            <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;grid-column:1/-1;">儲存設定</button>
       <div class="hint" style="margin-top:8px;">儲存後客人端重新整理即生效</div>
     </div>
   </div>
@@ -601,7 +747,17 @@ function setView(v){
 /* ── 店家設定 ── */
 /* ══ 設定：全站 + 各通路 ══ */
 let GLOBAL = { onlinePayOpen:false,
-  signupGift: { on:true, type:"points", points:30, cpName:"新會員折價券", cpValue:50, cpMin:0, giftPid:"", days:3 } };
+  signupGift: { on:true, type:"points", points:30, cpName:"新會員折價券", cpValue:50, cpMin:0, giftPid:"", days:3 },
+  pointRule:    { on:false, spendPer:100, ptsGet:1 },
+  redeemCatalog:[],
+  sauces:       ["招牌蒜蓉醬","原味老滷","微甜辣老滷"],
+  levels:       [
+    {name:"初入江湖", minPts:0,  perks:"入會送贈品・生日當月訂購加贈驚喜包"},
+    {name:"江湖老手", minPts:50, perks:"每月一張折價券・生日當月驚喜包"}
+  ],
+  referral:     { on:false, inviterName:"折價券 $50", inviterValue:50, inviterMin:200,
+                  inviteeName:"折價券 $30", inviteeValue:30, inviteeMin:150, days:30 }
+};
 let CHSET = {};   /* { fs:{open,annOn,annText,annImage,offDates}, sm:{...}, dl:{...} } */
 function curSet(){
   if(!CHSET[EDIT_CH]) CHSET[EDIT_CH] = {open:true, annOn:false, annText:"", annImage:"", offDates:[],
@@ -912,11 +1068,14 @@ function renderSettings(){
   bp.classList.toggle("on", !!s.onlinePay);
 
   renderCpCh();
+  initNewSettingCards();
 }
 $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
 $("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
 $("sw-signup").onclick = ()=>{ const sw=$("sw-signup"); sw.classList.toggle("on"); };
+if($("sw-pointrule")) $("sw-pointrule").onclick = ()=>{ $("sw-pointrule").classList.toggle("on"); };
+if($("sw-referral")) $("sw-referral").onclick = ()=>{ $("sw-referral").classList.toggle("on"); };
 window.toggleCard = (id, e)=>{
   if(e && e.target && e.target.classList.contains("switch")) return;
   const c = $(id); if(c) c.classList.toggle("open");
@@ -1008,7 +1167,19 @@ $("btn-save-set").onclick = async ()=>{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
     /* 註冊禮存全店設定 settings/global */
     GLOBAL.signupGift = collectSignupGift();
-    await setDoc(doc(db,"settings","global"), { signupGift: GLOBAL.signupGift }, {merge:true});
+    GLOBAL.pointRule = { on: !!($("sw-pointrule")||{}).classList?.contains("on"),
+      spendPer: num("pr-spend")||100, ptsGet: num("pr-pts")||1 };
+    GLOBAL.referral = { on: !!($("sw-referral")||{}).classList?.contains("on"),
+      inviterName: ($("ref-inviter-name")||{}).value?.trim()||"",
+      inviterValue: num("ref-inviter-val")||50, inviterMin: num("ref-inviter-min")||200,
+      inviteeName: ($("ref-invitee-name")||{}).value?.trim()||"",
+      inviteeValue: num("ref-invitee-val")||30, inviteeMin: num("ref-invitee-min")||150,
+      days: num("ref-days")||30 };
+    await setDoc(doc(db,"settings","global"), {
+      signupGift: GLOBAL.signupGift,
+      pointRule:  GLOBAL.pointRule,
+      referral:   GLOBAL.referral
+    }, {merge:true});
     renderSignupGift();
     toast("已儲存（" + cur.n + "）");
   }catch(e){
@@ -2026,7 +2197,38 @@ async function moveItem(idx, dir){
   }catch(err){ console.error(err); alert("排序儲存失敗：" + (err.message||"")); }
 }
 window.editName=editName; window.saveName=saveName; window.editVarName=editVarName; window.saveVarName=saveVarName;
-window.editDesc=editDesc; window.saveDesc=saveDesc;
+/* ════ 新功能 JS ════ */
+/* 優惠券 N 天到期模式 */
+let CP_EXP_MODE = "date";
+function setCpExpMode(m){
+  CP_EXP_MODE = m; const isDate = m==="date";
+  $("cp-exp-date-wrap").style.display = isDate?"":"none";
+  $("cp-exp-days-wrap").style.display = isDate?"none":"";
+  $("cp-exp-mode-date").classList.toggle("on",isDate);
+  $("cp-exp-mode-days").classList.toggle("on",!isDate);
+}
+window.setCpExpMode = setCpExpMode;
+
+/* 消費點數規則 */
+function renderPointRule(){
+  const r=GLOBAL.pointRule||{}; const sw=$("sw-pointrule");
+  if(sw) sw.classList.toggle("on",!!r.on);
+  setV("pr-spend",r.spendPer||100); setV("pr-pts",r.ptsGet||1); updatePrPreview();
+}
+function updatePrPreview(){
+  const sp=num("pr-spend")||100, pt=num("pr-pts")||1, el=$("pr-preview");
+  if(el) el.textContent=`例：消費 ${sp*3} → 取貨後獲得 ${pt*3} 點（每 ${sp} 元 ${pt} 點，取整數）`;
+}
+if($("pr-spend")) $("pr-spend").addEventListener("input",updatePrPreview);
+if($("pr-pts")) $("pr-pts").addEventListener("input",updatePrPreview);
+
+/* 點數兌換目錄 */
+let REDEEM_CATALOG=[];
+function renderRedeemList(){
+  const el=$("redeem-list"); if(!el) return;
+  if(!REDEEM_CATALOG.length){ el.innerHTML='<div class="hint">尚未設定任何兌換選項。</div>'; return; }
+  el.innerHTML=REDEEM_CATALOG.map((r,i)=>`<div class="rd-row"><div class="rd-pts">${r.pts} 點</div>
+    <div class="rd-body"><div>${esc(r.name)}${r.minSpend?' · 滿 
 window.addVar=addVar; window.delVar=delVar; window.addItem=addItem; window.delItem=delItem;
 window.moveItem=moveItem;
 
@@ -2046,11 +2248,16 @@ function renderMenu(){
   groups.forEach(g=>{
     const isOpen = !!menuOpenCats[g.cat];
     html += `<div class="cat-sec">
-      <button class="cat-head" onclick="toggleCat('${g.cat.replace(/'/g,"\\'")}')">
-        <span class="cat-caret">${isOpen?"▼":"▶"}</span>
-        <span class="cat-name">${g.cat}</span>
+      <div class="cat-head" style="cursor:default;">
+        <span class="cat-caret" onclick="toggleCat('${g.cat.replace(/'/g,\"\\\\'\")}')" style="cursor:pointer;">${isOpen?"▼":"▶"}</span>
+        <input class="cat-name" value="${g.cat.replace(/"/g,'&quot;')}"
+               onblur="saveCatName('${g.cat.replace(/'/g,\"\\\\'\")}'\u002c this.value)"
+               onclick="event.stopPropagation()"
+               title="直接改名，離開欄位即儲存"
+               style="border:none;background:transparent;font-size:15px;font-weight:800;color:var(--wine);letter-spacing:2px;font-family:inherit;border-radius:5px;padding:2px 6px;cursor:text;flex:1;"
+               onfocus="this.style.border='1px solid var(--wine)';this.style.background='#FCFAF3';">
         <span class="cat-count">${g.rows.length} 項</span>
-      </button>`;
+      </div>`;
     if(isOpen){
       html += `<div class="cat-body">`;
       g.rows.forEach(({p,idx})=>{
@@ -2085,6 +2292,282 @@ function renderMenu(){
               style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#FCFAF3;resize:vertical;min-height:56px;line-height:1.55;">${(p.desc||"").replace(/</g,"&lt;")}</textarea>
             <div class="hint" style="text-align:right;margin:3px 0 0;"><span id="desccnt-${idx}">${(p.desc||"").length}</span> / 60 字</div>
             <div class="hint" style="margin:2px 0 0;">留空就不會顯示在客人的點餐頁。三個通路共用（跟品名、照片一樣）。</div>
+          </div>
+          <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);">
+            <label style="display:block;font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:5px;">小標籤<span style="font-weight:400;color:var(--ink-soft);font-size:10.5px;margin-left:6px;">（可含 emoji，留空不顯示）</span></label>
+            <input id="tag-${idx}" value="${(p.tag||'').replace(/"/g,'&quot;')}" placeholder="例：🔥 本週人氣　✨ 新品上市"
+              onblur="saveTag(${idx})"
+              style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px;color:var(--ink);background:#FCFAF3;">
+            <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:11px;color:var(--ink-soft);">標籤顏色：</span>
+              ${["rose","gold","mint","blue","purple","brand"].map(c=>`<span onclick="saveTagColor(${idx},'${c}')"
+                style="display:inline-block;width:22px;height:22px;border-radius:50%;cursor:pointer;
+                background:${{rose:'#F7C0C8',gold:'#F7DFA0',mint:'#B0D8C8',blue:'#B0C8E8',purple:'#E0C8F0',brand:'#EDD9A3'}[c]};
+                outline:${(p.tagColor||'rose')===c?'3px solid var(--ink)':'none'};outline-offset:2px;"></span>`).join('')}
+            </div>
+          </div>
+          ${cur.type==="pickup" ? `
+          <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">
+            <span class="vl" style="font-weight:700;color:var(--ink);">每日限量</span>
+            <input type="number" min="0" placeholder="不限" value="${d.limit}" id="lim-${idx}" oninput="markDirty(${idx})">
+            <span class="u">份</span>
+          </div>` : ""}
+          ${(p.vars||[]).map((v,vi)=>`
+            <div class="vr">
+              <input class="vname-input" value="${(v.v||"").replace(/"/g,'&quot;')}" placeholder="規格（如：全雞）"
+                     oninput="editVarName(${idx},${vi},this.value)" onblur="saveVarName(${idx})">
+              <input type="number" min="0" value="${d.prices[vi]}" id="pr-${idx}-${vi}" oninput="markDirty(${idx})">
+              <span class="u">元</span>
+              ${(p.vars||[]).length>1? `<button class="mini-del" onclick="delVar(${idx},${vi})" title="刪除規格">✕</button>`:""}
+            </div>`).join("")}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn" style="background:none;border:1px solid var(--wine);color:var(--wine);padding:6px 12px;font-size:12.5px;" onclick="addVar(${idx})">＋ 新增規格</button>
+            <button class="btn" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:6px 12px;font-size:12.5px;margin-left:auto;" onclick="delItem(${idx})">🗑 刪除品項</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  const cats = groups.map(g=>g.cat);
+  const catOpts = cats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join("");
+  html += `<div class="add-card">
+    <div class="add-title">新增品項</div>
+    <label class="add-lb">分類</label>
+    <select id="add-cat" class="add-sel" onchange="onAddCatChange()">
+      ${catOpts}
+      <option value="__new__">＋ 新分類…</option>
+    </select>
+    <input id="add-newcat" class="add-inp" placeholder="輸入新分類名稱" style="display:none;">
+    <label class="add-lb">品項名稱</label>
+    <input id="add-name" class="add-inp" placeholder="輸入品項名稱">
+    <button class="btn btn-full" style="background:var(--wine);color:var(--cream);margin-top:12px;" onclick="addItem()">新增</button>
+  </div>`;
+  $("menu-body").innerHTML = html;
+}
+function onAddCatChange(){
+  const sel = $("add-cat"), inp = $("add-newcat");
+  if(inp) inp.style.display = (sel.value==="__new__") ? "block" : "none";
+}
+window.onAddCatChange = onAddCatChange;
+
+$("btn-save-menu").onclick = async ()=>{
+  if(!dirty.size){ toast("沒有變更"); return; }
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  let ok = 0, lastErr = null;
+  for(const idx of dirty){
+    const p = PRODUCTS[idx];
+    const limEl = $("lim-"+idx);
+    const limRaw = limEl ? limEl.value : "";
+    const prices = (p.vars||[]).map((v,vi)=> +($("pr-"+idx+"-"+vi).value || 0));
+    const payload = {};
+    payload["ch."+EDIT_CH+".prices"] = prices;
+    if(cur.type==="pickup") payload["ch."+EDIT_CH+".limit"] = (limRaw===""? null : +limRaw);
+    try{ await updateDoc(doc(db,"products",p.docId), payload); ok++; }
+    catch(e){ console.error("儲存菜單失敗", e); lastErr = e; }
+  }
+  dirty.clear();
+  if(lastErr){
+    const who = (auth.currentUser && auth.currentUser.email) || "未登入";
+    alert("部分品項儲存失敗\n\n錯誤：" + (lastErr.code||"") + "\n" + (lastErr.message||"") +
+          "\n\n登入帳號：" + who);
+  } else {
+    toast(`已儲存 ${ok} 個品項（${cur.n}）`);
+  }
+};
+</script>
+</body>
+</html>
++r.minSpend+' 可用':''}</div>
+    <div class="rd-sub">拿到後 ${r.days||30} 天內使用</div></div>
+    <button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delRedeemItem(${i})">刪除</button></div>`).join('');
+}
+window.delRedeemItem=function(i){ REDEEM_CATALOG.splice(i,1); renderRedeemList(); };
+window.addRedeemItem=function(){
+  const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),
+        val=num("rd-value"),min=num("rd-min"),days=num("rd-days")||30;
+  if(!pts||!name||!val){ alert("請填寫所需點數、券名稱、折抵金額"); return; }
+  REDEEM_CATALOG.push({pts,name,value:val,minSpend:min,days});
+  REDEEM_CATALOG.sort((a,b)=>a.pts-b.pts);
+  ["rd-pts","rd-name","rd-value","rd-min"].forEach(id=>{ const el=$(id); if(el) el.value=""; }); setV("rd-days",30);
+  renderRedeemList();
+};
+window.saveRedeemCatalog=async function(){
+  try{ await setDoc(doc(db,"settings","global"),{redeemCatalog:REDEEM_CATALOG},{merge:true});
+    GLOBAL.redeemCatalog=REDEEM_CATALOG; toast("點數兌換目錄已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
+};
+
+/* 靈魂滷汁 */
+let SAUCES=[];
+function renderSaucesList(){
+  const el=$("sauces-list"); if(!el) return;
+  el.innerHTML=SAUCES.map((s,i)=>`<div class="sauce-row">
+    <input value="${esc(s)}" onchange="SAUCES[${i}]=this.value"
+      style="flex:1;border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-family:inherit;font-size:13px;background:#FCFAF3;">
+    <button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delSauce(${i})">刪除</button>
+  </div>`).join('');
+}
+window.delSauce=function(i){ SAUCES.splice(i,1); renderSaucesList(); };
+window.addSauce=function(){
+  const v=(($("sauce-new")||{}).value||"").trim(); if(!v){ alert("請輸入滷汁名稱"); return; }
+  SAUCES.push(v); $("sauce-new").value=""; renderSaucesList();
+};
+window.saveSauces=async function(){
+  try{ await setDoc(doc(db,"settings","global"),{sauces:SAUCES},{merge:true});
+    GLOBAL.sauces=SAUCES; toast("滷汁選項已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
+};
+
+/* 邀請好友 */
+function renderReferral(){
+  const r=GLOBAL.referral||{}; const sw=$("sw-referral"); if(sw) sw.classList.toggle("on",!!r.on);
+  setV("ref-inviter-name",r.inviterName||""); setV("ref-inviter-val",r.inviterValue||50);
+  setV("ref-inviter-min",r.inviterMin||200); setV("ref-invitee-name",r.inviteeName||"");
+  setV("ref-invitee-val",r.inviteeValue||30); setV("ref-invitee-min",r.inviteeMin||150);
+  setV("ref-days",r.days||30);
+}
+
+/* 會員等級設定 */
+let LEVELS_EDIT=[];
+function renderLevelsList(){
+  const el=$("levels-list"); if(!el) return;
+  el.innerHTML=LEVELS_EDIT.map((lv,i)=>`<div class="lv-card">
+    <div class="lv-badge">${esc(lv.name)} · ${lv.minPts} 點起</div>
+    <div class="cp-fld"><label>等級名稱</label>
+      <input value="${esc(lv.name)}" onchange="LEVELS_EDIT[${i}].name=this.value;renderLevelsList()"></div>
+    ${i>0?`<div class="cp-fld"><label>升級門檻（累積點數）</label>
+      <input type="number" value="${lv.minPts}" min="1" onchange="LEVELS_EDIT[${i}].minPts=+this.value"></div>`:""}
+    <div class="cp-fld"><label>福利說明（客人會員頁顯示）</label>
+      <textarea rows="2" onchange="LEVELS_EDIT[${i}].perks=this.value">${esc(lv.perks||"")}</textarea></div>
+    ${i>0?`<div style="text-align:right;"><button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;" onclick="delLevel(${i})">刪除此等級</button></div>`:""}
+  </div>`).join('');
+}
+window.addLevel=function(){ LEVELS_EDIT.push({name:"新等級",minPts:100,perks:""}); renderLevelsList(); };
+window.delLevel=function(i){ LEVELS_EDIT.splice(i,1); renderLevelsList(); };
+window.saveLevels=async function(){
+  try{ await setDoc(doc(db,"settings","global"),{levels:LEVELS_EDIT},{merge:true});
+    GLOBAL.levels=LEVELS_EDIT; toast("會員等級設定已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
+};
+
+function initNewSettingCards(){
+  const r=GLOBAL.pointRule||{}; const prsw=$("sw-pointrule"); if(prsw) prsw.classList.toggle("on",!!r.on);
+  renderPointRule();
+  REDEEM_CATALOG=JSON.parse(JSON.stringify(GLOBAL.redeemCatalog||[])); renderRedeemList();
+  SAUCES=[...(GLOBAL.sauces||["招牌蒜蓉醬","原味老滷","微甜辣老滷"])]; renderSaucesList();
+  renderReferral();
+  LEVELS_EDIT=JSON.parse(JSON.stringify(GLOBAL.levels||[
+    {name:"初入江湖",minPts:0,perks:"入會送贈品・生日當月訂購加贈驚喜包"},
+    {name:"江湖老手",minPts:50,perks:"每月一張折價券・生日當月驚喜包"}
+  ])); renderLevelsList();
+}
+
+/* 分類改名 */
+async function saveCatName(oldCat,newName){
+  newName=(newName||"").trim(); if(!newName||newName===oldCat) return;
+  const toUpdate=PRODUCTS.filter(p=>p.cat===oldCat);
+  if(!toUpdate.length){ toast("此分類無品項"); return; }
+  try{
+    await Promise.all(toUpdate.map(p=>updateDoc(doc(db,"products",p.docId),{cat:newName})));
+    toast(`分類「${oldCat}」已改為「${newName}」`);
+  }catch(e){ console.error(e); alert("分類改名失敗："+e.message); }
+}
+window.saveCatName=saveCatName;
+
+/* 品項小標籤 */
+async function saveTag(idx){
+  const val=($("tag-"+idx)||{}).value?.trim()??""; const p=PRODUCTS[idx]; if(!p) return;
+  if(val===(p.tag||"")) return;
+  try{ await updateDoc(doc(db,"products",p.docId),{tag:val}); p.tag=val; toast(val?"標籤已更新":"標籤已清除");
+  }catch(e){ console.error(e); alert("標籤儲存失敗："+e.message); }
+}
+async function saveTagColor(idx,color){
+  const p=PRODUCTS[idx]; if(!p) return;
+  try{ await updateDoc(doc(db,"products",p.docId),{tagColor:color}); p.tagColor=color; toast("標籤顏色已更新"); renderMenu();
+  }catch(e){ console.error(e); alert("顏色儲存失敗："+e.message); }
+}
+window.saveTag=saveTag; window.saveTagColor=saveTagColor;
+
+window.editDesc=editDesc; window.saveDesc=saveDesc;
+window.addVar=addVar; window.delVar=delVar; window.addItem=addItem; window.delItem=delItem;
+window.moveItem=moveItem;
+
+function renderMenu(){
+  const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
+  let html = `<div class="ch-note">目前編輯：<b style="color:var(--wine);">${cur.n}</b>　價格、售完、限量都只影響這個通路。<br>照片與品項名稱三個通路共用。<br><span style="color:var(--ink-soft);">點分類展開／收起；展開後可拖拉品項或用 ▲▼ 調順序。</span></div>`;
+
+  /* 依分類分組（維持 PRODUCTS 既有順序） */
+  const groups = [];
+  const gmap = {};
+  PRODUCTS.forEach((p,idx)=>{
+    const cat = p.cat || "未分類";
+    if(!gmap[cat]){ gmap[cat] = {cat, rows:[]}; groups.push(gmap[cat]); }
+    gmap[cat].rows.push({p, idx});
+  });
+
+  groups.forEach(g=>{
+    const isOpen = !!menuOpenCats[g.cat];
+    html += `<div class="cat-sec">
+      <div class="cat-head" style="cursor:default;">
+        <span class="cat-caret" onclick="toggleCat('${g.cat.replace(/'/g,\"\\\\'\")}')" style="cursor:pointer;">${isOpen?"▼":"▶"}</span>
+        <input class="cat-name" value="${g.cat.replace(/"/g,'&quot;')}"
+               onblur="saveCatName('${g.cat.replace(/'/g,\"\\\\'\")}'\u002c this.value)"
+               onclick="event.stopPropagation()"
+               title="直接改名，離開欄位即儲存"
+               style="border:none;background:transparent;font-size:15px;font-weight:800;color:var(--wine);letter-spacing:2px;font-family:inherit;border-radius:5px;padding:2px 6px;cursor:text;flex:1;"
+               onfocus="this.style.border='1px solid var(--wine)';this.style.background='#FCFAF3';">
+        <span class="cat-count">${g.rows.length} 項</span>
+      </div>`;
+    if(isOpen){
+      html += `<div class="cat-body">`;
+      g.rows.forEach(({p,idx})=>{
+        const d = chData(p);
+        html += `<div class="mi ${d.on?"":"off"}" draggable="true"
+            ondragstart="menuDragStart(event,${idx})" ondragover="menuDragOver(event,${idx})"
+            ondrop="menuDrop(event,${idx})" ondragend="menuDragEnd(event)">
+          <div class="mi-h">
+            <span class="drag-handle" title="拖拉排序">⠿</span>
+            <span class="move-btns">
+              <button class="move-b" onclick="moveItem(${idx},-1)" title="上移">▲</button>
+              <button class="move-b" onclick="moveItem(${idx},1)" title="下移">▼</button>
+            </span>
+            <input class="nm-input" value="${(p.n||"").replace(/"/g,'&quot;')}" placeholder="品項名稱"
+                   oninput="editName(${idx}, this.value)" onblur="saveName(${idx})">
+            <span class="sw-lb">${d.on?"販售中":"售完/下架"}</span>
+            <button class="switch ${d.on?"on":""}" onclick="toggleItem(${idx})"></button>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+            <div class="ph-box" onclick="pickPhoto(${idx})">
+              ${p.photo? `<img src="${p.photo}" alt="">` : `<span>+<br>照片</span>`}
+            </div>
+            <div style="flex:1;">
+              <div class="hint" style="margin:0;">點左側方框上傳商品照片（三通路共用）<br>建議正方形、主體置中</div>
+              ${p.photo? `<button class="btn" style="margin-top:6px;background:none;border:1px solid #C8351F;color:#C8351F;padding:5px 12px;font-size:12px;" onclick="event.stopPropagation();removePhoto(${idx})">移除照片</button>`:""}
+            </div>
+          </div>
+          <div style="margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);">
+            <label style="display:block;font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:5px;">商品介紹</label>
+            <textarea id="desc-${idx}" maxlength="60" placeholder="例：選用溫體放山土雞，以海鹽與蔥薑低溫慢浸，肉質緊實不柴。"
+              oninput="editDesc(${idx}, this.value)" onblur="saveDesc(${idx})"
+              style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#FCFAF3;resize:vertical;min-height:56px;line-height:1.55;">${(p.desc||"").replace(/</g,"&lt;")}</textarea>
+            <div class="hint" style="text-align:right;margin:3px 0 0;"><span id="desccnt-${idx}">${(p.desc||"").length}</span> / 60 字</div>
+            <div class="hint" style="margin:2px 0 0;">留空就不會顯示在客人的點餐頁。三個通路共用（跟品名、照片一樣）。</div>
+          </div>
+          <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);">
+            <label style="display:block;font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:5px;">小標籤<span style="font-weight:400;color:var(--ink-soft);font-size:10.5px;margin-left:6px;">（可含 emoji，留空不顯示）</span></label>
+            <input id="tag-${idx}" value="${(p.tag||'').replace(/"/g,'&quot;')}" placeholder="例：🔥 本週人氣　✨ 新品上市"
+              onblur="saveTag(${idx})"
+              style="width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px;color:var(--ink);background:#FCFAF3;">
+            <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:11px;color:var(--ink-soft);">標籤顏色：</span>
+              ${["rose","gold","mint","blue","purple","brand"].map(c=>`<span onclick="saveTagColor(${idx},'${c}')"
+                style="display:inline-block;width:22px;height:22px;border-radius:50%;cursor:pointer;
+                background:${{rose:'#F7C0C8',gold:'#F7DFA0',mint:'#B0D8C8',blue:'#B0C8E8',purple:'#E0C8F0',brand:'#EDD9A3'}[c]};
+                outline:${(p.tagColor||'rose')===c?'3px solid var(--ink)':'none'};outline-offset:2px;"></span>`).join('')}
+            </div>
           </div>
           ${cur.type==="pickup" ? `
           <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">
