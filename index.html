@@ -861,13 +861,8 @@ function setPt(v){
 }
 function useAllPt(){ setPt(maxPoints()); }
 function renderPtBox(){
-  const box = $("pt-box"); if(!box) return;
-  const avail = (member && (member.available ?? member.points)) || 0;
-  if(!member || avail <= 0 || cpSel){ box.style.display = "none"; if(cpSel) ptUse = 0; return; }
-  box.style.display = "block";
-  $("pt-avail").textContent = avail;
-  const mx = maxPoints();
-  if(ptUse > mx) setPt(mx);
+  const box = $("pt-box"); if(box) box.style.display = "none";
+  ptUse = 0;
 }
 function updateCkSummary(){
   const t = totals();
