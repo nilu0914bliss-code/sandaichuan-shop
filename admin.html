@@ -2479,18 +2479,18 @@ function renderLevelsList(){
   const el=$("levels-list"); if(!el) return;
   el.innerHTML=LEVELS_EDIT.map(function(lv,i){
     var h='<div class="lv-card">'
-      +'<div class="lv-badge">'+esc(lv.name)+' · '+lv.minPts+' 點起</div>'
+      +'<div class="lv-badge">'+esc(lv.name)+(i>0?' · 滿 '+(lv.minSpend||0)+' 元':' · 入會')+'</div>'
       +'<div class="cp-fld"><label>等級名稱</label>'
-      +'<input value="'+esc(lv.name)+'" onchange="LEVELS_EDIT['+i+'].name=this.value;renderLevelsList()"></div>';
-    if(i>0) h+='<div class="cp-fld"><label>升級門檻（累積點數）</label>'
-      +'<input type="number" value="'+lv.minPts+'" min="1" onchange="LEVELS_EDIT['+i+'].minPts=+this.value"></div>';
+      +'<input value="'+esc(lv.name)+'" onchange="LEVELS_EDIT['+i+'].name=this.value;renderLevelsList()"></div>'+'<div class="cp-fld"><label>等級圖示（emoji）</label>'+'<input value="'+esc(lv.icon||"")+'" placeholder="🥢" maxlength="4" onchange="LEVELS_EDIT['+i+'].icon=this.value" style="font-size:18px;"></div>';
+    if(i>0) h+='<div class="cp-fld"><label>升級門檻（累積消費金額）</label>'
+      +'<input type="number" value="'+(lv.minSpend||0)+'" min="1" onchange="LEVELS_EDIT['+i+'].minSpend=+this.value"></div>';
     h+='<div class="cp-fld"><label>福利說明（客人會員頁顯示）</label>'
       +'<textarea rows="2" onchange="LEVELS_EDIT['+i+'].perks=this.value">'+esc(lv.perks||"")+'</textarea></div>';
     if(i>0) h+='<div style="text-align:right;"><button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;" onclick="delLevel('+i+')">刪除此等級</button></div>';
     return h+'</div>';
   }).join('');
 }
-window.addLevel=function(){ LEVELS_EDIT.push({name:"新等級",minPts:100,perks:""}); renderLevelsList(); };
+window.addLevel=function(){ LEVELS_EDIT.push({name:"新等級",icon:"",minSpend:1000,perks:""}); renderLevelsList(); };
 window.delLevel=function(i){ LEVELS_EDIT.splice(i,1); renderLevelsList(); };
 window.saveLevels=async function(){
   try{ await setDoc(doc(db,"settings","global"),{levels:LEVELS_EDIT},{merge:true});
@@ -2505,8 +2505,8 @@ function initNewSettingCards(){
   SAUCES=[...(GLOBAL.sauces||["招牌蒜蓉醬","原味老滷","微甜辣老滷"])]; renderSaucesList();
   renderReferral();
   LEVELS_EDIT=JSON.parse(JSON.stringify((GLOBAL.levels&&GLOBAL.levels.length)?GLOBAL.levels:[
-    {name:"初入江湖",minPts:0,perks:"入會送贈品・生日當月訂購加贈驚喜包"},
-    {name:"江湖老手",minPts:50,perks:"每月一張折價券・生日當月驚喜包"}
+    {name:"初入江湖",icon:"🥢",minSpend:0,perks:"入會送贈品・生日當月訂購加贈驚喜包"},
+    {name:"江湖老手",icon:"🍢",minSpend:2000,perks:"每月一張折價券・生日當月驚喜包"}
   ])); renderLevelsList();
 }
 
