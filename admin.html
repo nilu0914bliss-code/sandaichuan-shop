@@ -2113,6 +2113,33 @@ window.removePhoto = async idx=>{
     toast("照片已移除");
   }catch(e){ console.error(e); toast("移除失敗"); }
 };
+function allCatsInOrder(){
+  const seen=[], list=[];
+  PRODUCTS.forEach(p=>{ const c=p.cat||"未分類"; if(seen.indexOf(c)<0){ seen.push(c); list.push(c); } });
+  const s=curSet(); const order=s.catOrder||[];
+  list.sort((a,b)=>{ var ia=order.indexOf(a),ib=order.indexOf(b); if(ia<0)ia=999; if(ib<0)ib=999; return ia-ib; });
+  return list;
+}
+async function persistChSet(){
+  const s=curSet();
+  try{ await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true}); }
+  catch(e){ console.error("儲存通路設定失敗",e); alert("儲存失敗："+e.message); }
+}
+window.moveCat = async (cat,dir)=>{
+  const s=curSet();
+  let order=(s.catOrder&&s.catOrder.length)?s.catOrder.slice():allCatsInOrder();
+  const i=order.indexOf(cat); if(i<0) order.push(cat);
+  const ii=order.indexOf(cat), j=ii+dir;
+  if(j<0||j>=order.length) return;
+  const t=order[ii]; order[ii]=order[j]; order[j]=t;
+  s.catOrder=order; await persistChSet(); renderMenu();
+};
+window.toggleHideCat = async (cat)=>{
+  const s=curSet(); const hid=(s.catHidden||[]).slice();
+  const i=hid.indexOf(cat); if(i>=0) hid.splice(i,1); else hid.push(cat);
+  s.catHidden=hid; await persistChSet();
+  toast(i>=0?(cat+" 已改為顯示"):(cat+" 已隱藏（此通路）")); renderMenu();
+};
 window.toggleHideItem = async idx=>{
   const p = PRODUCTS[idx];
   const cur = chData(p).hidden;
@@ -2382,8 +2409,13 @@ function renderMenu(){
     gmap[cat].rows.push({p, idx});
   });
 
-  groups.forEach(g=>{
+  const _cs = curSet();
+  const _order = _cs.catOrder || [];
+  const _hidden = _cs.catHidden || [];
+  groups.sort((a,b)=>{ var ia=_order.indexOf(a.cat),ib=_order.indexOf(b.cat); if(ia<0)ia=999; if(ib<0)ib=999; return ia-ib; });
+  groups.forEach((g,gIdx)=>{
     const isOpen = !!menuOpenCats[g.cat];
+    const catIsHidden = _hidden.indexOf(g.cat) >= 0;
     var catJS = JSON.stringify(g.cat).replace(/"/g,"&quot;");
     var catAttr = esc(g.cat);
     html += '<div class="cat-sec">'
@@ -2394,7 +2426,10 @@ function renderMenu(){
       + ' onclick="event.stopPropagation()"'
       + ' title="直接改名，離開欄位即儲存"'
       + ' style="border:none;background:transparent;font-size:15px;font-weight:800;color:var(--wine);letter-spacing:2px;font-family:inherit;border-radius:5px;padding:2px 6px;cursor:text;flex:1;">'
-      + '<span class="cat-count">' + g.rows.length + ' 項</span>'
+      + '<button class="move-b" style="margin-left:4px;" onclick="moveCat(' + catJS + ',-1)" title="分類上移">▲</button>'
+      + '<button class="move-b" onclick="moveCat(' + catJS + ',1)" title="分類下移">▼</button>'
+      + '<button class="switch ' + (catIsHidden?"":"on") + '" style="margin-left:8px;" onclick="toggleHideCat(' + catJS + ')" title="隱藏後客人在此通路看不到整個分類"></button>'
+      + '<span class="cat-count" style="margin-left:6px;">' + g.rows.length + ' 項' + (catIsHidden?"・已隱藏":"") + '</span>'
       + '</div>';
     if(isOpen){
       html += `<div class="cat-body">`;
