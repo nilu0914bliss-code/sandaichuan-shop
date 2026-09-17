@@ -575,7 +575,13 @@ function rebuildProducts(){
       };
     })
   }));
-  applyProducts(out);
+  /* 分類隱藏 / 順序（此通路） */
+  const _cs = (SETTINGS.ch && SETTINGS.ch[k]) || {};
+  const _hidden = _cs.catHidden || [];
+  const _order = _cs.catOrder || [];
+  let out2 = out.filter(c=> _hidden.indexOf(c.cat) < 0);
+  out2.sort((a,b)=>{ var ia=_order.indexOf(a.cat),ib=_order.indexOf(b.cat); if(ia<0)ia=999; if(ib<0)ib=999; return ia-ib; });
+  applyProducts(out2);
 }
 function applyProducts(list){
   PRODUCTS.length = 0;
