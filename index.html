@@ -1381,14 +1381,61 @@ window.openRedeemPoints = function(){
   const catalog = SETTINGS.redeemCatalog || [];
   if(!catalog.length){ alert("目前尚未設定點數兌換選項。"); return; }
   const pts = member?.available ?? member?.points ?? 0;
-  const html = `<div style="padding:16px;">
-    <div style="font-size:16px;font-weight:800;color:var(--wine);margin-bottom:4px;">🪙 點數兌換</div>
-    <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">目前可用點數：<b style="color:var(--wine);font-size:17px;">${pts}</b> 點</div>
-    ${catalog.map((r,i)=>{
-      const canDo = pts >= r.pts;
-      return `<div style="display:flex;align-items:center;gap:9px;padding:11px;border-radius:8px;background:${canDo?'#fff':'#F5F5F5'};border:1px solid ${canDo?'var(--line)':'#DDD'};margin-bottom:9px;opacity:${canDo?1:.65};">
-        <div style="min-width:52px;text-align:center;background:${canDo?'var(--cream-soft)':'#EEE'};border-radius:5px;padding:5px;font-size:13px;font-weight:800;color:${canDo?'var(--wine)':'#999'};">${r.pts} 點</div>
-        <div style="flex:1;"><div style="font-size:13.5px;font-weight:700;">${r.name}${r.minSpend?' · 滿 
+  var html = '<div style="padding:16px;">'
+    + '<div style="font-size:16px;font-weight:800;color:var(--wine);margin-bottom:4px;">🪙 點數兌換</div>'
+    + '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">目前可用點數：<b style="color:var(--wine);font-size:17px;">' + pts + '</b> 點</div>'
+    + catalog.map(function(r,i){
+        var canDo = pts >= r.pts;
+        return '<div style="display:flex;align-items:center;gap:9px;padding:11px;border-radius:8px;background:' + (canDo?"#fff":"#F5F5F5") + ';border:1px solid ' + (canDo?"var(--line)":"#DDD") + ';margin-bottom:9px;opacity:' + (canDo?1:.65) + ';">'
+          + '<div style="min-width:52px;text-align:center;background:' + (canDo?"var(--cream-soft)":"#EEE") + ';border-radius:5px;padding:5px;font-size:13px;font-weight:800;color:' + (canDo?"var(--wine)":"#999") + ';">' + r.pts + ' 點</div>'
+          + '<div style="flex:1;"><div style="font-size:13.5px;font-weight:700;">' + r.name + (r.minSpend?" · 滿 $" + r.minSpend + " 可用":"") + '</div>'
+          + '<div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">折抵 $' + r.value + '・' + (r.days||30) + ' 天內使用</div></div>'
+          + (canDo
+              ? '<button onclick="doRedeemPoint(' + i + ')" style="background:var(--wine);color:var(--cream);border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">兌換</button>'
+              : '<span style="font-size:11.5px;color:#999;">點數不足</span>')
+          + '</div>';
+      }).join("")
+    + '</div>';
+  var box = document.getElementById("redeem-modal-body");
+  if(box){ box.innerHTML = html; }
+  var modal = document.getElementById("redeem-modal");
+  if(modal){ modal.classList.add("on"); }
+};
+window.closeRedeemModal = function(){ var m=document.getElementById("redeem-modal"); if(m) m.classList.remove("on"); };
+window.doRedeemPoint = async function(idx){
+  const catalog = SETTINGS.redeemCatalog || [];
+  const r = catalog[idx]; if(!r) return;
+  const pts = member?.available ?? member?.points ?? 0;
+  if(pts < r.pts){ alert("點數不足"); return; }
+  if(!confirm("確定用 " + r.pts + " 點兌換「" + r.name + "」？")) return;
+  try{
+    const expDays = r.days || 30;
+    const exp = new Date(Date.now() + expDays*86400000).toISOString().slice(0,10);
+    await addDoc(collection(db,"members",member.docId,"coupons"), {
+      name: r.name, type: "amount", value: r.value, minSpend: r.minSpend||0,
+      channels: CH.map(c=>c.k), expire: exp, used: false,
+      createdAt: serverTimestamp(), fromRedeem: true, cost: r.pts
+    });
+    const newAvail = pts - r.pts;
+    await updateDoc(doc(db,"members",member.docId), { available: newAvail });
+    member.available = newAvail;
+    alert("兌換成功！優惠券已發送到你的帳戶。");
+    closeRedeemModal();
+    if(typeof loadMemberCoupons==="function") await loadMemberCoupons();
+    if(typeof renderMember==="function") renderMember();
+  }catch(e){ console.error("兌換失敗", e); alert("兌換失敗：" + e.message); }
+};
+async function ensureRefCode(){
+  if(!member || member.refCode) return;
+  const code = (member.docId||"").slice(-6).toUpperCase() || Math.random().toString(36).slice(2,8).toUpperCase();
+  try{ await updateDoc(doc(db,"members",member.docId), { refCode: code }); member.refCode = code; }
+  catch(e){ console.error("建立邀請碼失敗", e); }
+}
+window.copyInviteLink = function(){
+  if(!member || !member.refCode){ alert("邀請碼尚未準備好，請稍候再試"); return; }
+  const link = location.origin + location.pathname + "?ref=" + member.refCode;
+  navigator.clipboard?.writeText(link).then(function(){ alert("邀請連結已複製！"); }).catch(function(){ alert("連結：" + link); });
+};
 function renderCoupons(){
   const t = todayISO();
   const groups = {
@@ -1864,40 +1911,6 @@ if(cfg.apiKey && cfg.projectId){
   badge.style.display = "";
   badge.textContent = "示範模式（尚未設定 Firebase）";
 }
-
-doRedeemPoint = async function(idx){
-  const catalog=SETTINGS.redeemCatalog||[]; const r=catalog[idx]; if(!r) return;
-  const pts=member?.available??member?.points??0; if(pts<r.pts){ alert("點數不足"); return; }
-  if(!confirm(`確定用 ${r.pts} 點兌換「${r.name}」嗎？`)) return;
-  try{
-    const uid=member.uid;
-    const exp=new Date(); exp.setDate(exp.getDate()+(r.days||30));
-    const expStr=exp.toISOString().slice(0,10);
-    await addDoc(collection(db,"usercoupons"),{
-      uid, name:r.name, type:"amount", value:r.value||0, minSpend:r.minSpend||0,
-      expire:expStr, used:false, source:"redeem", redeemedPts:r.pts, createdAt:new Date().toISOString()
-    });
-    await updateDoc(doc(db,"members",uid),{available:(member.available||0)-r.pts});
-    member.available=(member.available||0)-r.pts;
-    alert(`兌換成功！「${r.name}」已加入您的優惠券（${expStr} 到期）`);
-    renderMember(); go("p-member");
-  }catch(e){ console.error(e); alert("兌換失敗："+e.message); }
-};
-window.ensureRefCode = async function(){
-  if(!member) return;
-  if(member.refCode){ const el=document.getElementById("my-refcode"); if(el) el.textContent=member.refCode; return; }
-  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code="";
-  for(let i=0;i<6;i++) code+=chars[Math.floor(Math.random()*chars.length)];
-  try{
-    await updateDoc(doc(db,"members",member.uid),{refCode:code});
-    member.refCode=code; const el=document.getElementById("my-refcode"); if(el) el.textContent=code;
-  }catch(e){ console.error("refCode 產生失敗",e); }
-};
-window.copyInviteLink = function(){
-  if(!member?.refCode) return;
-  const link=location.origin+location.pathname+"?ref="+member.refCode;
-  navigator.clipboard?.writeText(link).then(()=>{ alert("邀請連結已複製！"); }).catch(()=>{ alert("連結："+link); });
-};
 </script>
 </body>
 </html>
