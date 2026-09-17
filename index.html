@@ -402,7 +402,7 @@
 
     <div id="cp-box" style="display:none;">
       <div class="f-sec">優 惠 券</div>
-      <div class="hint" style="margin:-2px 0 8px;">優惠券與點數<b>擇一使用</b></div>
+      <div class="hint" style="margin:-2px 0 8px;">點數可在會員頁兌換優惠券使用</div>
       <div id="cp-options"></div>
     </div>
 
@@ -1935,5 +1935,16 @@ if(cfg.apiKey && cfg.projectId){
   badge.textContent = "示範模式（尚未設定 Firebase）";
 }
 </script>
+<!-- 點數兌換彈窗 -->
+<div id="redeem-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);align-items:flex-end;justify-content:center;">
+  <div style="background:#fff;width:100%;max-width:480px;max-height:82vh;overflow:auto;border-radius:16px 16px 0 0;">
+    <div style="position:sticky;top:0;background:#fff;display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);">
+      <span style="flex:1;font-size:15px;font-weight:800;color:var(--wine);">🪙 點數兌換</span>
+      <button onclick="closeRedeemModal()" style="background:none;border:none;font-size:22px;color:var(--ink-soft);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="redeem-modal-body"></div>
+  </div>
+</div>
+<style>#redeem-modal.on{display:flex !important;}</style>
 </body>
 </html>
