@@ -925,7 +925,13 @@ window.sendCoupon = async ()=>{
   const name = $("cp-name").value.trim();
   const val = +$("cp-value").value;
   const min = +($("cp-min").value || 0);
-  const exp = $("cp-exp").value;
+  let exp;
+  if(CP_EXP_MODE === "days"){
+    const dcnt = +($("cp-exp-days")||{}).value || 30;
+    exp = new Date(Date.now() + dcnt*86400000).toISOString().slice(0,10);
+  } else {
+    exp = $("cp-exp").value;
+  }
   if(!name){ alert("請填寫券名稱"); return; }
   if(CP_TYPE!=="gift" && (!val || val<=0)){ alert("請填寫有效的折扣值"); return; }
   if(CP_TYPE==="percent" && (val<1 || val>9.9)){ alert("折數請填 1～9.9（例：9 = 九折）"); return; }
