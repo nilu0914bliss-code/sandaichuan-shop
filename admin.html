@@ -2604,6 +2604,15 @@ function renderLevelsList(){
 window.addLevel=function(){ LEVELS_EDIT.push({name:"新等級",icon:"",minSpend:1000,perks:""}); renderLevelsList(); };
 window.delLevel=function(i){ LEVELS_EDIT.splice(i,1); renderLevelsList(); };
 window.saveLevels=async function(){
+  /* 從畫面 DOM 重新收集，避免 LEVELS_EDIT 意外為空 */
+  const cards=[...document.querySelectorAll("#levels-list .lv-card")];
+  if(cards.length){
+    LEVELS_EDIT = cards.map(function(card,i){
+      const flds=[...card.querySelectorAll(".cp-fld")];
+      const get=function(kw){ const f=flds.find(function(x){return (x.querySelector("label")||{}).textContent&&x.querySelector("label").textContent.indexOf(kw)>=0;}); return f? f.querySelector("input,textarea").value : ""; };
+      return { name:get("名稱")||"會員", icon:get("emoji")||get("圖示")||"", minSpend: i===0?0:(+get("門檻")||0), perks:get("福利")||"" };
+    });
+  }
   try{ await setDoc(doc(db,"settings","global"),{levels:LEVELS_EDIT},{merge:true});
     GLOBAL.levels=LEVELS_EDIT; toast("會員等級設定已儲存");
   }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
