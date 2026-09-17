@@ -1139,7 +1139,6 @@ function renderSignupGift(){
 }
 
 function collectSignupGift(){
-  const val = id => ((document.getElementById(id)||{}).value || "").trim();
   const sw = document.getElementById("sw-signup");
   const g = GLOBAL.signupGift || {};
   return {
@@ -2217,7 +2216,6 @@ function renderPointRule(){
   setV("pr-spend",r.spendPer||100); setV("pr-pts",r.ptsGet||1); updatePrPreview();
 }
 function updatePrPreview(){
-  const val = id => ((document.getElementById(id)||{}).value || "").trim();
   const sp=num("pr-spend")||100, pt=num("pr-pts")||1, el=$("pr-preview");
   if(el) el.textContent=`例：消費 ${sp*3} → 取貨後獲得 ${pt*3} 點（每 ${sp} 元 ${pt} 點，取整數）`;
 }
@@ -2241,7 +2239,6 @@ function renderRedeemList(){
 }
 window.delRedeemItem=function(i){ REDEEM_CATALOG.splice(i,1); renderRedeemList(); };
 window.addRedeemItem=function(){
-  const val = id => ((document.getElementById(id)||{}).value || "").trim();
   const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),
         val=num("rd-value"),min=num("rd-min"),days=num("rd-days")||30;
   if(!pts||!name||!val){ alert("請填寫所需點數、券名稱、折抵金額"); return; }
