@@ -552,7 +552,10 @@ function chOpen(k){
 }
 function chOnlinePay(){ return MY_CH? !!chSet(MY_CH).onlinePay : false; }
 
-const SHIP_FEE = 160, FREE_AT = 1000; /* 運費規則為暫定假設，待店家確認 */
+function shipRule(){
+  const s = (MY_CH && typeof chSet==="function") ? chSet(MY_CH) : null;
+  return { fee: (s && s.shipFee!=null) ? +s.shipFee : 160, freeAt: (s && s.freeAt!=null) ? +s.freeAt : 1000 };
+}
 let RAW_PRODUCTS = [];
 function rebuildProducts(){
   if(!RAW_PRODUCTS.length) return;
@@ -647,7 +650,7 @@ function totals(){
     const [id,vi]=k.split("|"); const it=findItem(id);
     count+=q; sub+=it.vars[+vi].p*q;
   }
-  const ship = sub===0?0:(sub>=FREE_AT?0:SHIP_FEE);
+  const _sr=shipRule(); const ship = sub===0?0:((_sr.freeAt>0 && sub>=_sr.freeAt)?0:_sr.fee);
   return {count, sub, ship, total: sub+ship};
 }
 function renderBar(){
@@ -662,7 +665,7 @@ function renderBar(){
 function renderCart(){
   const t=totals();
   if(!t.count){ $("cart-body").innerHTML=`<div class="empty">購物車是空的，<br>回商品頁挑幾樣好料吧。</div>`; return; }
-  const gap = FREE_AT - t.sub;
+  const gap = shipRule().freeAt - t.sub;
   $("cart-body").innerHTML = `
     <div class="cart-list">
       ${Object.entries(cart).map(([k,q])=>{
@@ -1309,7 +1312,7 @@ function fillCheckout(){
 function clearCheckout(){ ["f-name","f-phone","f-email","f-store"].forEach(i=>$(i).value=""); $("f-city").value=""; $("bday-note").style.display="none"; }
 function orderSum(o){
   const sub=o.items.reduce((s,x)=>s+x[1]*x[2],0);
-  const ship=sub>=FREE_AT?0:SHIP_FEE;
+  const _sr2=shipRule(); const ship=(_sr2.freeAt>0 && sub>=_sr2.freeAt)?0:_sr2.fee;
   return {sub, ship, total:sub+ship};
 }
 let memFilter = "all";
