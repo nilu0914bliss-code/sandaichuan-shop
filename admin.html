@@ -448,9 +448,6 @@
           <div class="cp-fld"><label>發送對象</label>
             <select id="cp-target" onchange="countTargets()">
               <option value="all">全部會員</option>
-              <option value="lv1">滷林高手以上</option>
-              <option value="lv2">滷味宗師以上</option>
-              <option value="lv3">滷味霸主</option>
               <option value="bday">本月壽星</option>
             </select>
             <div class="hint" id="cp-count">計算中…</div>
@@ -845,7 +842,23 @@ function fillGiftOptions(){
   });
   sel.innerHTML = opts.join("") || `<option value="">目前沒有商品</option>`;
 }
+function fillCpTargets(){
+  const sel=$("cp-target"); if(!sel) return;
+  const cur=sel.value;
+  const lvs=(GLOBAL.levels||[]);
+  // 移除舊的 lv 選項
+  [...sel.querySelectorAll('option')].forEach(function(o){ if(o.value.indexOf("lv")===0) o.remove(); });
+  // 依實際等級加（跳過第0級入會，從第1級起才有「以上」意義）
+  const bday=sel.querySelector('option[value="bday"]');
+  for(let i=lvs.length-1;i>=1;i--){
+    const o=document.createElement("option");
+    o.value="lv"+i; o.textContent=(lvs[i].name||("等級"+i))+" 以上";
+    sel.insertBefore(o, bday);
+  }
+  if([...sel.options].some(function(o){return o.value===cur;})) sel.value=cur;
+}
 function renderCpCh(){
+  fillCpTargets();
   const el = $("cp-scope");
   if(el) el.innerHTML = `發送的券<b>三個取貨點都能使用</b>。<br>優惠券與點數<b>不能同時使用</b>，客人結帳時擇一。`;
 }
@@ -884,13 +897,12 @@ window.reloadMembers = async ()=>{
 function targetMembers(){
   const t = $("cp-target").value;
   const mth = new Date().getMonth()+1;
+  const lvs = (GLOBAL.levels||[]).map(function(l){return +(l.minSpend||0);});
   return MEMBERS_CACHE.filter(m=>{
     const sp = m.spent || 0;
     if(t==="all") return true;
-    if(t==="lv1") return sp >= LV_NEED[1];
-    if(t==="lv2") return sp >= LV_NEED[2];
-    if(t==="lv3") return sp >= LV_NEED[3];
     if(t==="bday") return m.birth && (+m.birth.split("-")[1] === mth);
+    if(t.indexOf("lv")===0){ var idx=+t.slice(2); return lvs[idx]!=null ? sp>=lvs[idx] : false; }
     return false;
   });
 }
