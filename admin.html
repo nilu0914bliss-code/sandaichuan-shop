@@ -1158,7 +1158,7 @@ function collectSignupGift(){
     on: sw ? sw.classList.contains("on") : true,
     type: g.type || "points",
     points: num("sg-points"),
-    cpName: val("sg-cp-name") || "新會員折價券",
+    cpName: valTrim("sg-cp-name") || "新會員折價券",
     cpValue: num("sg-cp-value"),
     cpMin: num("sg-cp-min"),
     giftPid: (document.getElementById("sg-gift")||{}).value || "",
