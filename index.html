@@ -873,7 +873,7 @@ function updateCkSummary(){
   const cpv = Math.min(cpValue(), gross);
   const use = cpv? 0 : Math.min(ptUse, gross - cpv);
   const lv = member? levelOf(member.spent) : LEVELS[0];
-  const earn = Math.floor((gross - use - cpv) / 100) * lv.rate;
+  const _pr = SETTINGS.pointRule || {}; const earn = (_pr.on ? Math.floor((gross - use - cpv) / (_pr.spendPer||100)) * (_pr.ptsGet||1) : 0);
   $("ck-summary").innerHTML = `
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
     <div class="row"><span>運費</span><span>${shipMethod==="pickup"?"自取免運":(ship===0?"免運":money(ship))}</span></div>
@@ -1526,7 +1526,7 @@ function renderMemberInner(){
       <div class="stat"><div class="v">${MY_ORDERS.length}</div><div class="k">訂購次數</div></div>
       <div class="stat"><div class="v" style="font-size:15px;">${member.birth? member.birth.slice(5).replace("-","/") : "未設定"}</div><div class="k">生日</div></div>
     </div>
-    <div style="font-size:11.5px;color:var(--ink-soft);margin:10px 0 0;line-height:1.8;">每消費滿 100 元累積 1 點，1 點折抵 1 元。取貨後入帳。</div>
+    ${(SETTINGS.pointRule && SETTINGS.pointRule.on) ? `<div style="font-size:11.5px;color:var(--ink-soft);margin:10px 0 0;line-height:1.8;">每消費滿 ${SETTINGS.pointRule.spendPer||100} 元累積 ${SETTINGS.pointRule.ptsGet||1} 點，點數可兌換優惠券。取貨後入帳。</div>` : ``}
     <div id="edit-box" style="display:none;background:#fff;border:none;border-radius:16px;padding:16px;margin:12px 0 0;box-shadow:0 1px 2px rgba(111,34,34,.05),0 6px 20px rgba(111,34,34,.07);">
       <div class="f-sec" id="ed-title" style="margin-top:0;">修 改 會 員 資 料</div>
       <div class="field"><label>手機號碼 *</label><input type="tel" id="ed-phone" placeholder="0912-345-678">
