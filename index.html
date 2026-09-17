@@ -732,6 +732,7 @@ window.pickCh = k=>{
   try{ localStorage.setItem("sdc_ch", k); }catch(e){}
   syncChBar();
   applyShopSettings(null);
+  rebuildProducts();
   renderCats(); renderMenu();
 
   /* 保留購物車：移除新通路沒有或售完的品項 */
