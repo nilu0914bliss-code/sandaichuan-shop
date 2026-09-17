@@ -1153,6 +1153,7 @@ function collectSignupGift(){
   };
 }
 $("btn-save-set").onclick = async ()=>{
+  const num = id => +((document.getElementById(id)||{}).value || 0);
   const s = curSet();
   s.annText = $("ann-input").value.trim();
   s.annImage = s.annImage || "";
