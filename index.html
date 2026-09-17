@@ -979,7 +979,7 @@ async function pay(){
   const ptApplied = (member && !cpApplied)? Math.min(ptUse, gross) : 0;
   const grand = gross - ptApplied - cpApplied;
   const myLv = member? levelOf(member.spent) : LEVELS[0];
-  const ptEarn = Math.floor(grand / 100) * myLv.rate;
+  const _pr2 = SETTINGS.pointRule || {}; const ptEarn = (_pr2.on ? Math.floor(grand / (_pr2.spendPer||100)) * (_pr2.ptsGet||1) : 0);
   const items = Object.entries(cart).map(([k,q])=>{
     const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
     return {name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:va.p};
