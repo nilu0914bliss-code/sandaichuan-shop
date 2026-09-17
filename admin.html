@@ -213,7 +213,7 @@
   .lv-badge{display:inline-block;background:var(--cream);border:1px solid var(--line);border-radius:5px;padding:3px 9px;font-size:12px;font-weight:800;color:var(--wine);margin-bottom:8px;}
 
   /* ───── 電腦模式（寬版）：只在 body.wide-mode 時生效，平板模式維持原樣 ───── */
-  body.wide-mode{max-width:1180px;margin:0 auto;}
+  body.wide-mode{max-width:1400px;margin:0 auto;}
   /* 訂單：兩欄 */
   body.wide-mode #list{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
   body.wide-mode #list .empty{grid-column:1/-1;}
@@ -221,10 +221,12 @@
   body.wide-mode .cat-body{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
   body.wide-mode .cat-body .mi{margin-bottom:0;}
   /* 設定：設定卡兩欄 */
-  body.wide-mode #v-set .m-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
-  body.wide-mode #v-set .m-wrap > .ch-note{grid-column:1/-1;}
-  body.wide-mode #v-set .m-wrap > .save-bar{grid-column:1/-1;}
-  body.wide-mode #v-set .scard{margin-bottom:0;}
+  body.wide-mode #v-set .m-wrap{column-count:2;column-gap:12px;display:block;}
+  body.wide-mode #v-set .scard{break-inside:avoid;display:inline-block;width:100%;margin-bottom:12px;}
+  body.wide-mode #v-set .m-wrap > .ch-note{column-span:all;}
+  body.wide-mode #v-set .m-wrap > .set-group-title{column-span:all;}
+  body.wide-mode #v-set .m-wrap > .save-bar{column-span:all;}
+  
   /* 視窗較窄時自動退回單欄，避免擠壓 */
   @media (max-width:820px){
     body.wide-mode #list,
@@ -523,6 +525,28 @@
         <div class="scard-b"><div class="inner">
           <div class="sw-row"><span class="l">信用卡 / LINE Pay</span><button class="switch" id="sw-onlinePay"></button></div>
           <div class="hint">開啟後，此通路的客人可選線上付款。金流部署完成前請保持關閉。</div>
+        </div></div>
+      </div>
+
+      <!-- 運費設定（僅宅配通路顯示） -->
+      <div class="scard" id="sc-ship" style="display:none;">
+        <div class="scard-h" onclick="toggleCard('sc-ship',event)">
+          <i class="ic">🚚</i><span class="t">運費設定</span><span class="scope-tag scope-ch">此通路</span>
+          <span class="sbadge" id="badge-ship"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">宅配訂單的運費規則。自取通路免運，不會顯示這張卡。</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <span style="font-size:13px;color:var(--ink);">運費</span>
+            <input type="number" id="ship-fee" min="0" value="160" style="width:100px;">
+            <span style="font-size:13px;color:var(--ink);">元</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;color:var(--ink);">消費滿</span>
+            <input type="number" id="ship-free" min="0" value="1000" style="width:100px;">
+            <span style="font-size:13px;color:var(--ink);">元免運（設 0 = 不提供免運）</span>
+          </div>
+          <div class="hint" id="ship-preview" style="margin-top:8px;"></div>
         </div></div>
       </div>
 
@@ -1022,6 +1046,13 @@ window.onTimeChange = ()=>{
   s.tGapH = +$("t-gapH").value || 20;
   renderTimePreview();
 };
+function renderShipPreview(){
+  const fee=num("ship-fee"), free=num("ship-free"), el=$("ship-preview");
+  if(!el) return;
+  el.textContent = free>0 ? ("例：消費未滿 "+free+" 元收運費 "+fee+" 元；滿 "+free+" 元免運。") : ("每筆宅配訂單固定收運費 "+fee+" 元。");
+}
+if($("ship-fee")) $("ship-fee").addEventListener("input", renderShipPreview);
+if($("ship-free")) $("ship-free").addEventListener("input", renderShipPreview);
 function renderTimePreview(){
   const s = curSet();
   const draw = (start,end,gap,elId)=>{
@@ -1084,6 +1115,18 @@ function renderSettings(){
   bp.classList.toggle("on", !!s.onlinePay);
 
   renderCpCh();
+
+  const shipCard = $("sc-ship");
+  if(shipCard){
+    if(cur.type !== "pickup"){
+      shipCard.style.display = "";
+      setV("ship-fee", (s.shipFee!=null? s.shipFee : 160));
+      setV("ship-free", (s.freeAt!=null? s.freeAt : 1000));
+      const bs = $("badge-ship"); if(bs){ bs.textContent = "$"+(s.shipFee!=null?s.shipFee:160); }
+      renderShipPreview();
+    } else { shipCard.style.display = "none"; }
+  }
+
   initNewSettingCards();
 }
 $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
@@ -1176,6 +1219,9 @@ $("btn-save-set").onclick = async ()=>{
   s.tStartH = $("t-startH").value || "06:00";
   s.tEndH = $("t-endH").value || "12:30";
   s.tGapH = +$("t-gapH").value || 20;
+  if(($("sc-ship")||{}).style && $("sc-ship").style.display !== "none"){
+    s.shipFee = num("ship-fee"); s.freeAt = num("ship-free");
+  }
   try{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
     /* 註冊禮存全店設定 settings/global */
