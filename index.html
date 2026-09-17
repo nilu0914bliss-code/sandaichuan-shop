@@ -872,7 +872,7 @@ function updateCkSummary(){
   const gross = t.sub + ship;
   const cpv = Math.min(cpValue(), gross);
   const use = cpv? 0 : Math.min(ptUse, gross - cpv);
-  const lv = member? levelOf(member.spent) : LEVELS[0];
+  const lv = member? levelOf(member.spent) : getLevels()[0];
   const _pr = SETTINGS.pointRule || {}; const earn = (_pr.on ? Math.floor((gross - use - cpv) / (_pr.spendPer||100)) * (_pr.ptsGet||1) : 0);
   $("ck-summary").innerHTML = `
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
@@ -978,7 +978,7 @@ async function pay(){
   const giftOn = cpGiftOk(cpDoc, tt.sub);
   const ptApplied = (member && !cpApplied)? Math.min(ptUse, gross) : 0;
   const grand = gross - ptApplied - cpApplied;
-  const myLv = member? levelOf(member.spent) : LEVELS[0];
+  const myLv = member? levelOf(member.spent) : getLevels()[0];
   const _pr2 = SETTINGS.pointRule || {}; const ptEarn = (_pr2.on ? Math.floor(grand / (_pr2.spendPer||100)) * (_pr2.ptsGet||1) : 0);
   const items = Object.entries(cart).map(([k,q])=>{
     const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
@@ -1124,12 +1124,23 @@ function fmtDate(iso){
 const STEPS = ["訂單成立","備貨中","完成"];
 
 /* ══ 會員等級 ══ */
-const LEVELS = [
-  {n:"初入江湖", icon:"🥢", need:0,     rate:1, perks:["入會送 30 點（下次手機預訂可以使用）","記得到會員資料填生日，生日當月訂購享生日優惠"]},
-  {n:"滷林高手", icon:"🍢", need:2000,  rate:1, perks:["點數 1 倍","每月會員日・闆娘小驚喜"]},
-  {n:"滷味宗師", icon:"🍖", need:6000,  rate:2, perks:["點數 2 倍","每月優惠券","新品優先試吃"]},
-  {n:"滷味霸主", icon:"👑", need:12000, rate:3, perks:["點數 3 倍","生日豪華禮","專屬活動與隱藏優惠"]}
+const LEVELS_FALLBACK = [
+  {n:"初入江湖", icon:"🥢", need:0,    perks:["入會送贈品","生日當月訂購享優惠"]},
+  {n:"江湖老手", icon:"🍢", need:2000, perks:["每月一張折價券","生日當月驚喜包"]}
 ];
+function getLevels(){
+  const src = (SETTINGS.levels && SETTINGS.levels.length) ? SETTINGS.levels : null;
+  if(!src) return LEVELS_FALLBACK;
+  return src.map(function(lv){
+    return {
+      n: lv.name || "會員",
+      icon: lv.icon || "",
+      need: +(lv.minSpend||0),
+      perks: String(lv.perks||"").split(/[\n・,，]/).map(function(s){return s.trim();}).filter(Boolean)
+    };
+  });
+}
+Object.defineProperty(window, "LEVELS", { get: function(){ return getLevels(); } });
 function signupPerks(){
   const g = (SETTINGS && SETTINGS.signupGift) || {};
   const birthLine = "記得到會員資料填生日，生日當月訂購享生日優惠";
@@ -1148,12 +1159,13 @@ function signupPerks(){
   return [giftLine, birthLine];
 }
 function levelOf(spent){
-  let lv = LEVELS[0];
-  LEVELS.forEach(x=>{ if((spent||0) >= x.need) lv = x; });
+  const L = getLevels();
+  let lv = L[0];
+  L.forEach(x=>{ if((spent||0) >= x.need) lv = x; });
   return lv;
 }
 function nextLevelOf(spent){
-  return LEVELS.find(x=>(spent||0) < x.need) || null;
+  return getLevels().find(x=>(spent||0) < x.need) || null;
 }
 let authReady = false;
 let wasLoggedIn = false;
@@ -1512,9 +1524,9 @@ function renderMemberInner(){
         </div>
         <div class="lv-s" style="margin-top:8px;">已達最高等級，感謝您的支持！</div>`}
       <div id="perks" style="display:none;margin-top:10px;">
-        ${LEVELS.map(x=>{
+        ${getLevels().map((x,_i)=>{
           let perks = x.perks.slice();
-          if(x.n==="初入江湖"){ perks = signupPerks(); }
+          if(_i===0){ perks = signupPerks(); }
           return `<div class="perk ${x.n===lv.n?"on":""}">
           <div class="pk-n">${x.icon} ${x.n}${x.need? "（滿 "+money(x.need)+"）":"（加入會員）"}</div>
           <div class="pk-l">${perks.map(p=>"・"+p).join("<br>")}</div>
