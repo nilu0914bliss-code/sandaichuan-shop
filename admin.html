@@ -2113,6 +2113,15 @@ window.removePhoto = async idx=>{
     toast("照片已移除");
   }catch(e){ console.error(e); toast("移除失敗"); }
 };
+window.toggleHideItem = async idx=>{
+  const p = PRODUCTS[idx];
+  const cur = chData(p).hidden;
+  try{
+    await updateDoc(doc(db,"products",p.docId), {["ch."+EDIT_CH+".hidden"]: !cur});
+    toast(p.n + (cur? " 已改為顯示" : " 已隱藏（此通路）"));
+    renderMenu();
+  }catch(e){ console.error("隱藏切換失敗", e); alert("失敗："+e.message); }
+};
 window.toggleItem = async idx=>{
   const p = PRODUCTS[idx];
   const cur = chData(p).on;
@@ -2129,6 +2138,7 @@ function chData(p){
   const c = (p.ch && p.ch[EDIT_CH]) || {};
   return {
     on: c.on !== false,
+    hidden: c.hidden === true,
     limit: (c.limit === undefined || c.limit === null) ? "" : c.limit,
     prices: (p.vars||[]).map((v,vi)=> (c.prices && c.prices[vi] !== undefined && c.prices[vi] !== null) ? c.prices[vi] : v.p)
   };
@@ -2403,6 +2413,8 @@ function renderMenu(){
                    oninput="editName(${idx}, this.value)" onblur="saveName(${idx})">
             <span class="sw-lb">${d.on?"販售中":"售完/下架"}</span>
             <button class="switch ${d.on?"on":""}" onclick="toggleItem(${idx})"></button>
+            <span class="sw-lb" style="margin-left:10px;">${d.hidden?"已隱藏":"顯示中"}</span>
+            <button class="switch ${d.hidden?"":"on"}" onclick="toggleHideItem(${idx})" title="隱藏後客人在此通路看不到此品項"></button>
           </div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
             <div class="ph-box" onclick="pickPhoto(${idx})">
