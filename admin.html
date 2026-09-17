@@ -2464,7 +2464,7 @@ function initNewSettingCards(){
   REDEEM_CATALOG=JSON.parse(JSON.stringify(GLOBAL.redeemCatalog||[])); renderRedeemList();
   SAUCES=[...(GLOBAL.sauces||["招牌蒜蓉醬","原味老滷","微甜辣老滷"])]; renderSaucesList();
   renderReferral();
-  LEVELS_EDIT=JSON.parse(JSON.stringify(GLOBAL.levels||[
+  LEVELS_EDIT=JSON.parse(JSON.stringify((GLOBAL.levels&&GLOBAL.levels.length)?GLOBAL.levels:[
     {name:"初入江湖",minPts:0,perks:"入會送贈品・生日當月訂購加贈驚喜包"},
     {name:"江湖老手",minPts:50,perks:"每月一張折價券・生日當月驚喜包"}
   ])); renderLevelsList();
