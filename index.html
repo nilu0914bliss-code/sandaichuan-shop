@@ -562,7 +562,7 @@ function rebuildProducts(){
   const k = MY_CH || "fs";
   const out = RAW_PRODUCTS.map(c=>({
     cat: c.cat,
-    items: c.items.map(p=>{
+    items: c.items.filter(p=>{ const cd=(p.ch&&p.ch[k])||{}; return cd.hidden!==true; }).map(p=>{
       const cd = (p.ch && p.ch[k]) || {};
       return {
         id: p.pid, n: p.n, img: p.photo||"", desc: p.desc||"", tag: p.tag||"", tagColor: p.tagColor||"rose",
