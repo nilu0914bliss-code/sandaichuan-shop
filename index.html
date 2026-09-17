@@ -1411,11 +1411,19 @@ window.doRedeemPoint = async function(idx){
   try{
     const expDays = r.days || 30;
     const exp = new Date(Date.now() + expDays*86400000).toISOString().slice(0,10);
-    await addDoc(collection(db,"members",member.docId,"coupons"), {
-      name: r.name, type: "amount", value: r.value, minSpend: r.minSpend||0,
-      channels: CH.map(c=>c.k), expire: exp, used: false,
+    var couponData = {
+      name: r.name, type: (r.type||"amount"), minSpend: r.minSpend||0,
+      channels: CH.map(function(c){return c.k;}), expire: exp, used: false,
       createdAt: serverTimestamp(), fromRedeem: true, cost: r.pts
-    });
+    };
+    if(r.type==="gift"){
+      couponData.value = 0;
+      couponData.giftName = r.giftName || "贈品";
+      if(r.giftKey){ couponData.giftPid = String(r.giftKey).split("|")[0]; }
+    } else {
+      couponData.value = r.value;
+    }
+    await addDoc(collection(db,"members",member.docId,"coupons"), couponData);
     const newAvail = pts - r.pts;
     await updateDoc(doc(db,"members",member.docId), { available: newAvail });
     member.available = newAvail;
