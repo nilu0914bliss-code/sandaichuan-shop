@@ -566,12 +566,25 @@
               <input id="rd-name" placeholder="券名稱（例：折價券 $50）" style="flex:1;min-width:130px;">
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:7px;">
-              <input type="number" id="rd-value" placeholder="折抵金額" style="width:90px;">
-              <span style="font-size:12px;color:var(--ink-soft);">元・門檻</span>
-              <input type="number" id="rd-min" placeholder="0" style="width:80px;">
-              <span style="font-size:12px;color:var(--ink-soft);">元・拿到後</span>
-              <input type="number" id="rd-days" value="30" style="width:60px;">
-              <span style="font-size:12px;color:var(--ink-soft);">天到期</span>
+              <div class="seg" style="flex-wrap:wrap;margin-bottom:7px;">
+                <button class="seg-b on" id="rd-t-amount" onclick="setRdType('amount')">折抵金額</button>
+                <button class="seg-b" id="rd-t-percent" onclick="setRdType('percent')">打折</button>
+                <button class="seg-b" id="rd-t-gift" onclick="setRdType('gift')">送品項</button>
+              </div>
+              <div id="rd-val-wrap" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="number" id="rd-value" placeholder="折抵金額" style="width:90px;">
+                <span id="rd-vunit" style="font-size:12px;color:var(--ink-soft);">元・門檻</span>
+                <input type="number" id="rd-min" placeholder="0" style="width:80px;"><span style="font-size:12px;color:var(--ink-soft);">元</span>
+              </div>
+              <div id="rd-gift-wrap" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="rd-gift" style="flex:1;min-width:130px;padding:8px;border:1px solid var(--line);border-radius:5px;font-family:inherit;"></select>
+                <span style="font-size:12px;color:var(--ink-soft);">門檻</span>
+                <input type="number" id="rd-gmin" placeholder="0" style="width:70px;"><span style="font-size:12px;color:var(--ink-soft);">元</span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:7px;">
+                <span style="font-size:12px;color:var(--ink-soft);">拿到後</span>
+                <input type="number" id="rd-days" value="30" style="width:60px;"><span style="font-size:12px;color:var(--ink-soft);">天到期</span>
+              </div>
             </div>
             <div style="text-align:right;"><button class="btn btn-sm" onclick="addRedeemItem()">新增</button></div>
           </div>
@@ -2232,19 +2245,46 @@ function renderRedeemList(){
   if(!REDEEM_CATALOG.length){ el.innerHTML='<div class="hint">尚未設定任何兌換選項。</div>'; return; }
   el.innerHTML=REDEEM_CATALOG.map(function(r,i){
     return '<div class="rd-row"><div class="rd-pts">'+r.pts+' 點</div>'
-      +'<div class="rd-body"><div>'+esc(r.name)+(r.minSpend?' · 滿 $'+r.minSpend+' 可用':'')+'</div>'
+      +'<div class="rd-body"><div>'+esc(r.name)+' <span style="color:var(--wine);font-size:11px;">('+(r.type==="percent"?(r.value+" 折"):r.type==="gift"?("🎁 "+esc(r.giftName||"贈品")):("折 $"+r.value))+')</span>'+(r.minSpend?' · 滿 $'+r.minSpend+' 可用':'')+'</div>'
       +'<div class="rd-sub">拿到後 '+(r.days||30)+' 天內使用</div></div>'
       +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delRedeemItem('+i+')">刪除</button></div>';
   }).join('');
 }
 window.delRedeemItem=function(i){ REDEEM_CATALOG.splice(i,1); renderRedeemList(); };
+window.RD_TYPE="amount";
+window.setRdType=function(t){
+  window.RD_TYPE=t;
+  $("rd-t-amount").classList.toggle("on",t==="amount");
+  $("rd-t-percent").classList.toggle("on",t==="percent");
+  $("rd-t-gift").classList.toggle("on",t==="gift");
+  $("rd-val-wrap").style.display=t==="gift"?"none":"flex";
+  $("rd-gift-wrap").style.display=t==="gift"?"flex":"none";
+  if(t==="amount"){ $("rd-vunit").textContent="元・門檻"; $("rd-value").placeholder="折抵金額"; }
+  if(t==="percent"){ $("rd-vunit").textContent="折・門檻"; $("rd-value").placeholder="折數(例:9)"; }
+  if(t==="gift"){ fillRdGiftOptions(); }
+};
+function fillRdGiftOptions(){
+  var sel=$("rd-gift"); if(!sel) return;
+  var opts=[];
+  PRODUCTS.forEach(function(p){ (p.vars||[]).forEach(function(v,vi){ opts.push('<option value="'+p.docId+"|"+vi+'">'+esc(p.n)+(v.v?"（"+esc(v.v)+"）":"")+"</option>"); }); });
+  sel.innerHTML=opts.join("")||'<option value="">目前沒有商品</option>';
+}
 window.addRedeemItem=function(){
-  const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),
-        val=num("rd-value"),min=num("rd-min"),days=num("rd-days")||30;
-  if(!pts||!name||!val){ alert("請填寫所需點數、券名稱、折抵金額"); return; }
-  REDEEM_CATALOG.push({pts,name,value:val,minSpend:min,days});
+  const pts=num("rd-pts"),name=(($("rd-name")||{}).value||"").trim(),days=num("rd-days")||30;
+  if(!pts||!name){ alert("請填寫所需點數與券名稱"); return; }
+  var item={pts:pts,name:name,type:(window.RD_TYPE||"amount"),days:days};
+  if(item.type==="gift"){
+    var gk=($("rd-gift")||{}).value||""; if(!gk){ alert("請選擇贈送品項"); return; }
+    var pr=gk.split("|"); var pp=PRODUCTS.find(function(x){return x.docId===pr[0];});
+    var vn=(pp&&pp.vars[+pr[1]]&&pp.vars[+pr[1]].v)?("（"+pp.vars[+pr[1]].v+"）"):"";
+    item.giftKey=gk; item.giftName=pp?(pp.n+vn):"贈品"; item.value=0; item.minSpend=num("rd-gmin");
+  } else {
+    var vv=num("rd-value"); if(!vv){ alert(item.type==="percent"?"請填折數":"請填折抵金額"); return; }
+    item.value=vv; item.minSpend=num("rd-min");
+  }
+  REDEEM_CATALOG.push(item);
   REDEEM_CATALOG.sort(function(a,b){return a.pts-b.pts;});
-  ["rd-pts","rd-name","rd-value","rd-min"].forEach(function(id){ var el=$(id); if(el) el.value=""; }); setV("rd-days",30);
+  ["rd-pts","rd-name","rd-value","rd-min","rd-gmin"].forEach(function(id){ var el=$(id); if(el) el.value=""; }); setV("rd-days",30);
   renderRedeemList();
 };
 window.saveRedeemCatalog=async function(){
