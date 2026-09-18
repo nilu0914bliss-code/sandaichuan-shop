@@ -1171,18 +1171,24 @@ function signupPerks(){
   const birthLine = "記得到會員資料填生日，生日當月訂購享生日優惠";
   if(g.on === false) return [birthLine];
   const days = g.days || 3;
-  let giftLine;
-  if(g.type === "coupon"){
-    giftLine = `入會送「${g.cpName||"折價券"}」（折抵 ${g.cpValue||0} 元，領取後 ${days} 天內使用）`;
-  } else if(g.type === "gift"){
-    let name = "贈品";
-    try{ const p = (typeof RAW_PRODUCTS!=="undefined"? RAW_PRODUCTS.flatMap(c=>c.items):[]).find(x=>(x.pid||x.docId)===g.giftPid); if(p) name = p.n; }catch(e){}
-    giftLine = `入會送「${name}」×1（領取後 ${days} 天內使用）`;
-  } else {
-    giftLine = `入會送 ${g.points??30} 點（領取後 ${days} 天內使用）`;
+  let items = Array.isArray(g.items)? g.items.slice() : [];
+  if(!items.length && g.type){
+    if(g.type==="coupon") items=[{type:"amount",name:g.cpName,value:g.cpValue,min:g.cpMin}];
+    else if(g.type==="gift") items=[{type:"gift",giftPid:g.giftPid}];
+    else items=[{type:"points",points:g.points}];
   }
-  return [giftLine, birthLine];
+  const lines = items.map(function(it){
+    if(it.type==="amount") return "入會送「"+(it.name||"折價券")+"」（折抵 "+(it.value||0)+" 元"+(it.min? "，滿 "+it.min+" 元可用":"")+"）";
+    if(it.type==="percent") return "入會送「"+(it.name||"折扣券")+"」（"+(it.value||0)+" 折"+(it.min? "，滿 "+it.min+" 元可用":"")+"）";
+    if(it.type==="gift"){ var name=it.giftName||"贈品"; try{ var p=(typeof RAW_PRODUCTS!=="undefined"? RAW_PRODUCTS.flatMap(function(c){return c.items;}):[]).find(function(y){return (y.pid||y.docId)===it.giftPid;}); if(p) name=p.n; }catch(e){} return "入會送「"+name+"」×1"; }
+    if(it.type==="points") return "入會送 "+(it.points||0)+" 點";
+    return "";
+  }).filter(Boolean);
+  if(!lines.length) return [birthLine];
+  const withDays = lines.map(function(l,i){ return i===lines.length-1? l+"（領取後 "+days+" 天內使用）" : l; });
+  return withDays.concat([birthLine]);
 }
+
 function levelOf(spent){
   const L = getLevels();
   let lv = L[0];
@@ -1235,7 +1241,7 @@ async function grantSignupGift(uid, m){
   const g = (SETTINGS && SETTINGS.signupGift) || {};
   /* 安全防呆：設定還沒載入好（讀不到 type）時，先不要動作、也不要蓋已領章，
      這樣下次登入還會再試，避免「標記已領卻沒發」的慘況 */
-  if(!g || !g.type){
+  if(!g || (!g.type && !(Array.isArray(g.items)&&g.items.length))){
     console.warn("註冊禮設定尚未載入，這次不發放也不標記，待下次登入重試");
     return;
   }
@@ -1898,38 +1904,37 @@ if(cfg.apiKey && cfg.projectId){
     };
     /* 發放註冊禮：依設定加點數或發券/贈品，並在會員文件標記 signupGifted，避免重複 */
     window.fbGrantSignup = async (uid, g, curPoints)=>{
-      /* 防呆：type 不是有效值就完全不動作、不蓋章，避免標記已領卻沒發 */
-      if(!g || !["points","coupon","gift"].includes(g.type)){
-        console.warn("fbGrantSignup：無效的註冊禮類型，跳過", g);
-        return undefined;
-      }
+      if(!g) return undefined;
       const days = g.days || 3;
       const exp = new Date(); exp.setDate(exp.getDate() + days);
       const expStr = exp.getFullYear()+"-"+String(exp.getMonth()+1).padStart(2,"0")+"-"+String(exp.getDate()).padStart(2,"0");
-      const memberPatch = { signupGifted: true };
-      let granted = false;
-      if(g.type === "points"){
-        memberPatch.points = (curPoints||0) + (g.points||0);
-        granted = true;
-      } else if(g.type === "coupon"){
-        await addDoc(collection(db,"usercoupons"), {
-          uid, name: g.cpName||"新會員折價券", type:"amount",
-          value: g.cpValue||0, min: g.cpMin||0, expire: expStr,
-          used:false, source:"signup", createdAt: serverTimestamp()
-        });
-        granted = true;
-      } else if(g.type === "gift"){
-        await addDoc(collection(db,"usercoupons"), {
-          uid, name:"新會員贈品", type:"gift",
-          giftPid: g.giftPid||"", giftName: g.giftName||"贈品", min:0, expire: expStr,
-          used:false, source:"signup", createdAt: serverTimestamp()
-        });
-        granted = true;
+      let items = Array.isArray(g.items)? g.items.slice() : [];
+      if(!items.length && g.type){
+        if(g.type==="points") items=[{type:"points", points:g.points||0}];
+        else if(g.type==="coupon") items=[{type:"amount", name:g.cpName||"新會員折價券", value:g.cpValue||0, min:g.cpMin||0}];
+        else if(g.type==="gift") items=[{type:"gift", giftPid:g.giftPid||"", giftName:g.giftName||"贈品"}];
       }
-      if(!granted) return undefined;   /* 沒發成功就不蓋章 */
+      if(!items.length){ console.warn("fbGrantSignup：無有效註冊禮，跳過", g); return undefined; }
+      const memberPatch = { signupGifted: true };
+      let granted=false, pts=(curPoints||0);
+      for(const it of items){
+        if(it.type==="points"){ pts += (it.points||0); memberPatch.points=pts; granted=true; }
+        else if(it.type==="amount"){
+          await addDoc(collection(db,"usercoupons"), {uid, name: it.name||"新會員折價券", type:"amount", value: it.value||0, min: it.min||0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
+          granted=true;
+        } else if(it.type==="percent"){
+          await addDoc(collection(db,"usercoupons"), {uid, name: it.name||"新會員折扣券", type:"percent", value: it.value||0, min: it.min||0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
+          granted=true;
+        } else if(it.type==="gift"){
+          await addDoc(collection(db,"usercoupons"), {uid, name: it.giftName? ("新會員贈品｜"+it.giftName) : "新會員贈品", type:"gift", giftPid: it.giftPid||"", giftName: it.giftName||"贈品", min:0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
+          granted=true;
+        }
+      }
+      if(!granted) return undefined;
       await setDoc(doc(db,"members",uid), memberPatch, {merge:true});
       return memberPatch.points;
     };
+
     window.fbSaveMember = async (uid, data)=>{
       try{ await setDoc(doc(db,"members",uid), data, {merge:true}); }catch(e){ console.error(e); }
     };
