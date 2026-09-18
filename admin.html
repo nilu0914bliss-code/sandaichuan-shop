@@ -1841,6 +1841,22 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
+/* 依寬度把字串折行（中文無空白、逐字量測），回傳多行陣列，避免加料字串印超出紙寬被切掉 */
+function wrapByWidth(ctx, text, font, maxW){
+  ctx.font = font;
+  var lines=[], cur="";
+  text = String(text==null?"":text);
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(ch==="\n"){ lines.push(cur); cur=""; continue; }
+    var test=cur+ch;
+    if(ctx.measureText(test).width > maxW && cur!==""){ lines.push(cur); cur=ch; }
+    else { cur=test; }
+  }
+  if(cur!=="") lines.push(cur);
+  return lines.length? lines : [""];
+}
+
 function renderTicketImage(d){
   const W = 384;            /* 58mm 熱感機標準點寬（邏輯寬度） */
   const PAD = 18;           /* 左右留白 */
@@ -1883,9 +1899,16 @@ function renderTicketImage(d){
   h += 28;
   h += 40;                          /* 三欄標題列 */
   /* 品項：每項 品名(50) + 副標(34) + 間距(20) */
-  d.items.forEach(x=>{ h += 50 + (itemSub(x) ? 34 : 0) + ((x.addons&&x.addons.length)? x.addons.length*30 : 0) + 20; });
+  d.items.forEach(x=>{
+    let addH=0;
+    if(x.addons&&x.addons.length){ x.addons.forEach(function(a){ addH += wrapByWidth(ctx,"＋"+a,F_ISUB,W-PAD-(PAD+54)).length*30; }); }
+    h += 50 + (itemSub(x) ? 34 : 0) + addH + 20;
+  });
   h += 14;
-  if(d.sauce && d.sauce!=="-" && d.sauce!==""){ h += 48; }  /* 滷汁 */
+  if(d.sauce && d.sauce!=="-" && d.sauce!==""){   /* 加料（整單）：逐段折行量高 */
+    let sH=0; String(d.sauce).split("　").forEach(function(p){ sH += wrapByWidth(ctx,p,F_BODY,W-PAD-(PAD+88)).length*34; });
+    h += sH + 14;
+  }
   if(d.shipFee) h += 46;
   if(d.couponDiscount) h += 46;
   if(d.pointsUsed) h += 46;
@@ -2011,15 +2034,21 @@ function renderTicketImage(d){
     /* 副標（規格） */
     const sub = itemSub(x);
     if(sub){ left(sub, F_ISUB, nameX); y += 34; }
-    if(x.addons && x.addons.length){ x.addons.forEach(function(a){ left("＋" + a, F_ISUB, nameX); y += 30; }); }
+    if(x.addons && x.addons.length){ x.addons.forEach(function(a){ wrapByWidth(ctx,"＋"+a,F_ISUB,W-PAD-nameX).forEach(function(ln){ left(ln, F_ISUB, nameX); y += 30; }); }); }
     y += 20;
   });
 
   y += 14;
 
-  /* 滷汁（移到品項下方，冒號對齊底部欄位） */
+  /* 加料（整單，移到品項下方）：逐段折行，避免長字串印出紙外 */
   if(d.sauce && d.sauce!=="-" && d.sauce!==""){
-    drawLabelValue(ctx, "加料", d.sauce, y, F_BODY, PAD); y += 48;
+    ctx.font=F_BODY; ctx.textAlign="left"; ctx.fillStyle="#000";
+    ctx.fillText("加料", PAD, y);
+    var vx = PAD + 88;
+    String(d.sauce).split("　").forEach(function(p){
+      wrapByWidth(ctx, p, F_BODY, W-PAD-vx).forEach(function(ln){ ctx.textAlign="left"; ctx.fillText(ln, vx, y); y += 34; });
+    });
+    y += 14;
   }
 
   /* 運費／優惠券／點數 */
