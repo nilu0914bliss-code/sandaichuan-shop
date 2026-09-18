@@ -581,8 +581,9 @@ function rebuildProducts(){
     items: c.items.filter(p=>{ const cd=(p.ch&&p.ch[k])||{}; return cd.hidden!==true; }).map(p=>{
       const cd = (p.ch && p.ch[k]) || {};
       return {
-        id: p.pid, n: p.n, img: p.photo||"", desc: p.desc||"", tag: p.tag||"", tagColor: p.tagColor||"rose",
-        sold: cd.on === false,
+        id: p.pid, docId: p._docId, n: p.n, img: p.photo||"", desc: p.desc||"", tag: p.tag||"", tagColor: p.tagColor||"rose",
+        sold: cd.on === false || (typeof window._STK!=="undefined" && window._STK && p._docId && window._STK[p._docId]!=null && window._STK[p._docId]<=0),
+        stockLeft: (typeof window._STK!=="undefined" && window._STK && p._docId && window._STK[p._docId]!=null)? window._STK[p._docId] : null,
         limit: (cd.limit===undefined||cd.limit===null)? null : cd.limit,
         vars: (p.vars||[]).map((v,vi)=>({
           v: v.v,
@@ -760,6 +761,7 @@ window.pickCh = k=>{
   applyShopSettings(null);
   rebuildProducts();
   renderCats(); renderMenu();
+  if(window.fbLoadStock) window.fbLoadStock(k);
 
   /* 保留購物車：移除新通路沒有或售完的品項 */
   const removed = [];
@@ -1071,16 +1073,31 @@ async function pay(){
   // ── 現金單：直接建立正式訂單 ──
   let savedDocId = null;
   if(window.fbSaveOrder){
+    let stockInfo=null;
+    if(shipMethod==="pickup" && MY_CH){
+      const dec={};
+      for(const [ck,cq] of Object.entries(cart)){
+        const cid=ck.split("|")[0]; const cit=findItem(cid);
+        if(cit && cit.docId && cit.stockLeft!=null){ dec[cit.docId]=(dec[cit.docId]||0)+cq; }
+      }
+      if(Object.keys(dec).length) stockInfo={ch:MY_CH, dec};
+    }
     try{
       btn.disabled=true; btn.textContent="訂單送出中…";
-      savedDocId = await window.fbSaveOrder(order);
+      savedDocId = await window.fbSaveOrder(order, stockInfo);
     }catch(e){
       console.error("訂單送出失敗", e);
-      alert("訂單送出失敗\n\n" + (e.code||"") + "\n" + (e.message||"") + "\n\n請把這段訊息回報給開發者。");
+      if(e && e.code==="OUT_OF_STOCK"){
+        alert("很抱歉，您點的品項剛好賣完或庫存不足了，請調整數量後再送出 🙏");
+      } else {
+        alert("訂單送出失敗\n\n" + (e.code||"") + "\n" + (e.message||"") + "\n\n請把這段訊息回報給開發者。");
+      }
       btn.disabled=false; syncPayBtn();
+      if(window.fbLoadStock && MY_CH) window.fbLoadStock(MY_CH);
       return;
     }
     btn.disabled=false; syncPayBtn();
+    if(window.fbLoadStock && MY_CH) window.fbLoadStock(MY_CH);
   }
 
   if(member && typeof refreshMyOrders === "function"){
@@ -1793,10 +1810,36 @@ if(cfg.apiKey && cfg.projectId){
       });
     };
     // 現金單：直接建立正式訂單
-    window.fbSaveOrder = async (o)=>{
+    window.fbSaveOrder = async (o, stockInfo)=>{
       o.createdAt = serverTimestamp();
+      if(stockInfo && stockInfo.dec && Object.keys(stockInfo.dec).length){
+        return await runTransaction(db, async tx=>{
+          const ch=stockInfo.ch, ids=Object.keys(stockInfo.dec), snaps={};
+          for(const id of ids){ snaps[id]=await tx.get(doc(db,"counters","stk_"+id+"_"+ch)); }
+          for(const id of ids){
+            const s=snaps[id]; if(!s.exists()) continue; const dt=s.data();
+            if(!dt || dt.n==null) continue;
+            if(dt.n < stockInfo.dec[id]){ const e=new Error("庫存不足"); e.code="OUT_OF_STOCK"; throw e; }
+          }
+          for(const id of ids){
+            const s=snaps[id]; if(!s.exists()) continue; const dt=s.data();
+            if(!dt || dt.n==null) continue;
+            tx.update(doc(db,"counters","stk_"+id+"_"+ch), {n: dt.n - stockInfo.dec[id]});
+          }
+          const oref=doc(collection(db,"orders")); tx.set(oref, o); return oref.id;
+        });
+      }
       const ref = await addDoc(collection(db,"orders"), o);
       return ref.id;
+    };
+    window.fbLoadStock = async (ch)=>{
+      try{
+        const snap=await getDocs(collection(db,"counters"));
+        const m={};
+        snap.forEach(d=>{ const x=d.data(); if(x&&x.kind==="stock"&&x.ch===ch&&x.n!=null){ m[x.product]=x.n; } });
+        window._STK=m;
+        if(typeof rebuildProducts==="function" && typeof RAW_PRODUCTS!=="undefined" && RAW_PRODUCTS.length) rebuildProducts();
+      }catch(e){ console.error("讀取庫存失敗", e); }
     };
     // 線上付款：先存暫存區，付款成功後由雲端建立正式訂單並取號
     window.fbSavePending = async (o)=>{
@@ -1811,12 +1854,14 @@ if(cfg.apiKey && cfg.projectId){
       snap.forEach(doc=>{
         const p = doc.data();
         if(p.on === false) return;
+        p._docId = doc.id;
         (cats[p.cat] ||= {cat:p.cat, catSort:p.catSort??99, items:[]}).items.push(p);
       });
       const list = Object.values(cats).sort((a,b)=>a.catSort-b.catSort);
       list.forEach(c=>c.items.sort((a,b)=>(a.sort??0)-(b.sort??0)));
       RAW_PRODUCTS = list;
       rebuildProducts();
+      if(window.fbLoadStock) window.fbLoadStock(MY_CH);
     }
     /* 設定改為背景載入，不阻擋後面的「登入狀態監聽」啟動（避免手機卡在「登入狀態確認中」）*/
     (async()=>{ try{
