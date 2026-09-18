@@ -1321,6 +1321,8 @@ async function loadSettings(){
     }
   }catch(e){ console.error("讀取設定失敗", e); }
   renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift();
+  /* 設定載入完成後補畫菜單，讓分類順序/隱藏在後台也立即套用（修：後台顯示舊順序） */
+  if(typeof renderMenu==="function" && Array.isArray(PRODUCTS) && PRODUCTS.length) renderMenu();
 }
 
 /* ── 註冊禮設定 ── */
