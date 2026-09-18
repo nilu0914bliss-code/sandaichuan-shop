@@ -682,12 +682,21 @@ function shopEmbed(url){
 }
 function igAutoResize(){
   if(window.__igResizeInit) return; window.__igResizeInit=true;
+  window.__igNudged=window.__igNudged||new WeakSet();
+  function nudge(el){
+    if(window.__igNudged.has(el)) return; window.__igNudged.add(el);
+    setTimeout(function(){ var s=el.src; el.src="about:blank"; setTimeout(function(){ el.src=s; },150); },1200);
+  }
   window.addEventListener("message",function(ev){
     if(String(ev.origin).indexOf("instagram.com")<0) return;
     var d; try{ d=(typeof ev.data==="string")?JSON.parse(ev.data):ev.data; }catch(e){ return; }
-    if(!d||d.type!=="MEASURE"||!d.details||!d.details.height) return;
+    if(!d||!d.type) return;
     var ifr=document.querySelectorAll("#shopinfo-body .si-vwrap-ig iframe");
-    for(var i=0;i<ifr.length;i++){ if(ifr[i].contentWindow===ev.source){ ifr[i].style.height=d.details.height+"px"; } }
+    for(var i=0;i<ifr.length;i++){
+      if(ifr[i].contentWindow!==ev.source) continue;
+      if(d.type==="MEASURE" && d.details && d.details.height>0){ ifr[i].style.height=d.details.height+"px"; }
+      else if(d.type==="MOUNTED" || (d.type==="MEASURE" && (!d.details || !d.details.height))){ nudge(ifr[i]); }
+    }
   });
 }
 function renderShopInfo(){
