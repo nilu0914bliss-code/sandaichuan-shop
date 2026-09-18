@@ -283,6 +283,7 @@
     <button class="mtab on" id="mt-orders">訂單</button>
     <button class="mtab" id="mt-menu">菜單</button>
     <button class="mtab" id="mt-set">設定</button>
+    <button class="mtab" id="mt-member">會員資訊</button>
   </div>
 
   <div class="view show" id="v-orders">
@@ -685,6 +686,22 @@
     </div>
   </div>
 
+  <div class="view" id="v-member">
+    <div class="m-wrap" style="max-width:600px;">
+      <div class="scard open" style="margin-bottom:12px;">
+        <div class="scard-b" style="display:block;border:none;"><div class="inner">
+          <div style="font-size:15px;font-weight:800;color:var(--wine);margin-bottom:10px;">🔍 查詢會員</div>
+          <div style="display:flex;gap:8px;">
+            <input id="mb-search" placeholder="輸入手機號碼" inputmode="tel" style="flex:1;padding:11px 13px;border:1px solid var(--line);border-radius:8px;font-size:15px;font-family:inherit;background:#fff;" onkeydown="if(event.key==='Enter')searchMember()">
+            <button class="btn btn-w" style="padding:11px 20px;" onclick="searchMember()">查詢</button>
+          </div>
+          <div class="hint" style="margin-top:6px;">輸入完整手機號碼後按查詢。</div>
+        </div></div>
+      </div>
+      <div id="mb-result"></div>
+    </div>
+  </div>
+
   <div class="view" id="v-menu">
     <div class="m-wrap" id="menu-body"><div class="empty">載入中…</div></div>
     <div class="save-bar"><button class="btn btn-full" id="btn-save-menu">儲存菜單變更</button></div>
@@ -774,12 +791,101 @@ $("mt-orders").onclick = ()=>setView("orders");
 $("mt-menu").onclick = ()=>setView("menu");
 $("mt-set").onclick = ()=>setView("set");
 function setView(v){
-  ["orders","menu","set"].forEach(x=>{
+  ["orders","menu","set","member"].forEach(x=>{
     $("v-"+x).classList.toggle("show", x===v);
     $("mt-"+x).classList.toggle("on", x===v);
   });
   window.scrollTo(0,0);
+  if(v==="member" && !MEMBERS_OK) loadMembers().then(()=>{});
 }
+
+/* ══ 會員資訊分頁 ══ */
+let MB_CUR = null;
+function mbLevelName(spent){
+  const names=(GLOBAL.levels&&GLOBAL.levels.length)?GLOBAL.levels:[{name:"初入江湖",minSpend:0},{name:"江湖老手",minSpend:2000}];
+  let lv=names[0];
+  names.forEach(function(x){ if((spent||0)>=(x.minSpend||0)) lv=x; });
+  return (lv.icon?lv.icon+" ":"")+(lv.name||"會員");
+}
+function mbKV(k,v){ return '<div style="background:var(--cream-soft);border-radius:6px;padding:8px 10px;"><div style="font-size:11px;color:var(--ink-soft);">'+k+'</div><div style="font-weight:700;">'+v+'</div></div>'; }
+window.searchMember = async function(){
+  const phone=((($("mb-search"))||{}).value||"").trim();
+  const box=$("mb-result");
+  if(!phone){ box.innerHTML='<div class="hint" style="color:#C8351F;">請輸入手機號碼</div>'; return; }
+  box.innerHTML='<div class="hint">查詢中…</div>';
+  if(!MEMBERS_OK){ await loadMembers(); }
+  const m=MEMBERS_CACHE.find(function(x){ return (x.phone||"")===phone||(x.tel||"")===phone; });
+  if(!m){ box.innerHTML='<div class="hint" style="color:#C8351F;">查無此手機的會員。</div>'; return; }
+  MB_CUR=m; renderMemberInfo(m); loadMemberOrders(m.uid);
+};
+function renderMemberInfo(m){
+  const box=$("mb-result");
+  const avail=(m.available!=null?m.available:(m.points||0));
+  const cum=m.points||0;
+  box.innerHTML='<div class="scard open" style="margin-bottom:12px;"><div class="scard-b" style="display:block;border:none;"><div class="inner">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--wine);">'+esc(m.name||m.lineName||"未命名會員")+'</div>'
+    +'<div style="font-size:13px;color:var(--ink-soft);margin:2px 0 12px;">'+mbLevelName(m.spent)+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13.5px;">'
+    +mbKV("手機",esc(m.phone||m.tel||"未設定"))+mbKV("生日",esc(m.birth||"未設定"))
+    +mbKV("可用點數",avail+" 點")+mbKV("累積點數",cum+" 點")
+    +mbKV("累積消費","$"+(m.spent||0))+mbKV("邀請碼",esc(m.refCode||"未產生"))
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:14px;">'
+    +'<button class="btn btn-w" style="flex:1;padding:10px;" onclick="mbGrantPoints()">＋ 補送點數</button>'
+    +'<button class="btn" style="flex:1;padding:10px;background:#fff;border:1px solid var(--wine);color:var(--wine);" onclick="mbGrantCoupon()">＋ 補送優惠券</button>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--wine);margin:16px 0 6px;">歷史訂單</div>'
+    +'<div id="mb-orders"><div class="hint">載入中…</div></div>'
+    +'</div></div></div>';
+}
+async function loadMemberOrders(uid){
+  const el=$("mb-orders"); if(!el) return;
+  try{
+    const snap=await getDocs(collection(db,"orders"));
+    const mine=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());})
+      .filter(function(o){return o.uid===uid;})
+      .sort(function(a,b){return (b.createdAt&&b.createdAt.seconds||0)-(a.createdAt&&a.createdAt.seconds||0);});
+    if(!mine.length){ el.innerHTML='<div class="hint">尚無訂單。</div>'; return; }
+    el.innerHTML=mine.map(function(o){
+      const items=(o.items||[]).map(function(it){return "　・"+esc(it.name||"")+" ×"+(it.qty||it.q||1);}).join("<br>");
+      const dt=o.createdAt&&o.createdAt.seconds?new Date(o.createdAt.seconds*1000).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+      return '<div style="border:1px solid var(--line);border-radius:6px;padding:9px 11px;margin-bottom:7px;font-size:12.5px;">'
+        +'<div style="display:flex;justify-content:space-between;font-weight:700;"><span>'+esc(o.orderNo||o.id.slice(-6))+'</span><span style="color:var(--wine);">$'+(o.total||0)+'</span></div>'
+        +'<div style="color:var(--ink-soft);font-size:11.5px;margin:2px 0;">'+dt+"　"+esc(o.status||"")+'</div>'
+        +'<div style="line-height:1.7;">'+items+'</div></div>';
+    }).join("");
+  }catch(e){ el.innerHTML='<div class="hint" style="color:#C8351F;">訂單讀取失敗：'+e.message+'</div>'; }
+}
+window.mbGrantPoints = async function(){
+  if(!MB_CUR) return;
+  const n=prompt("補送幾點給「"+(MB_CUR.name||"此會員")+"」？","");
+  const pts=parseInt(n,10);
+  if(!pts||pts<=0) return;
+  if(!confirm("確定補送 "+pts+" 點給「"+(MB_CUR.name||"此會員")+"」？")) return;
+  try{
+    const newAvail=(MB_CUR.available!=null?MB_CUR.available:(MB_CUR.points||0))+pts;
+    const newPoints=(MB_CUR.points||0)+pts;
+    await updateDoc(doc(db,"members",MB_CUR.uid),{available:newAvail,points:newPoints});
+    MB_CUR.available=newAvail; MB_CUR.points=newPoints;
+    const idx=MEMBERS_CACHE.findIndex(function(x){return x.uid===MB_CUR.uid;});
+    if(idx>=0){ MEMBERS_CACHE[idx].available=newAvail; MEMBERS_CACHE[idx].points=newPoints; }
+    toast("已補送 "+pts+" 點"); renderMemberInfo(MB_CUR); loadMemberOrders(MB_CUR.uid);
+  }catch(e){ alert("補送失敗："+e.message); }
+};
+window.mbGrantCoupon = async function(){
+  if(!MB_CUR) return;
+  const name=prompt("優惠券名稱（例：折價券 $50）","折價券 $50");
+  if(!name) return;
+  const v=parseInt(prompt("折抵金額（元）","50"),10);
+  if(!v||v<=0){ alert("折抵金額不正確"); return; }
+  const days=parseInt(prompt("幾天內到期？","30"),10)||30;
+  if(!confirm("確定補送「"+name+" 折抵$"+v+"」給「"+(MB_CUR.name||"此會員")+"」？")) return;
+  try{
+    const exp=new Date(Date.now()+days*86400000).toISOString().slice(0,10);
+    await addDoc(collection(db,"members",MB_CUR.uid,"coupons"),{name:name,type:"amount",value:v,minSpend:0,channels:CH.map(function(c){return c.k;}),expire:exp,used:false,createdAt:serverTimestamp(),fromAdmin:true});
+    toast("已補送優惠券");
+  }catch(e){ alert("補送失敗："+e.message); }
+};
 
 /* ── 店家設定 ── */
 /* ══ 設定：全站 + 各通路 ══ */
