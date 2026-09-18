@@ -681,6 +681,46 @@
         </div></div>
       </div>
 
+      <style>
+        .agcard{border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:#FCFAF3;}
+        .agname{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-weight:800;font-size:14px;font-family:inherit;background:#fff;margin-bottom:8px;box-sizing:border-box;}
+        .agsegs{margin-bottom:4px;line-height:2.2;}
+        .agk{font-size:11px;color:var(--ink-soft);margin:0 3px 0 2px;}
+        .agseg{display:inline-flex;border:1px solid var(--wine);border-radius:999px;overflow:hidden;font-size:11px;margin-right:8px;vertical-align:middle;}
+        .agseg b{padding:4px 10px;cursor:pointer;color:var(--wine);font-weight:600;}
+        .agseg b.on{background:var(--wine);color:var(--cream);}
+        .agorow{display:flex;gap:6px;align-items:center;margin:6px 0;}
+        .agon{flex:1;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:13px;background:#fff;min-width:0;}
+        .agop{width:66px;border:1px solid var(--line);border-radius:6px;padding:7px 4px;font-family:inherit;font-size:13px;text-align:center;background:#fff;}
+        .agdel{border:1px solid #C8351F;color:#C8351F;background:#fff;border-radius:6px;padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit;flex-shrink:0;}
+        .agbtns{display:flex;gap:8px;margin-top:8px;}
+        .agadd{border:1px dashed var(--wine);color:var(--wine);background:#fff;border-radius:6px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+        .agdelg{border:1px solid #C8351F;color:#C8351F;background:#fff;border-radius:6px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;font-family:inherit;}
+        .pa-wrap{margin-top:11px;padding:10px 11px;border:1.5px solid var(--wine);border-radius:9px;background:#FCF7EC;}
+        .pa-h{font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:7px;}
+        .pa-row{display:flex;align-items:center;gap:9px;padding:7px 2px;border-bottom:1px dashed var(--line);cursor:pointer;}
+        .pa-row:last-child{border-bottom:none;}
+        .pa-cbx{width:20px;height:20px;border:2px solid #c7b58e;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;flex-shrink:0;}
+        .pa-row.on .pa-cbx{background:var(--wine);border-color:var(--wine);}
+        .pa-nm{flex:1;font-size:13px;}
+        .pa-md{font-size:10.5px;color:var(--ink-soft);}
+        .pa-empty{font-size:11.5px;color:var(--ink-soft);}
+      </style>
+      <div class="scard" id="sc-addons">
+        <div class="scard-h" onclick="toggleCard('sc-addons',event)">
+          <i class="ic">🧂</i><span class="t">加料設定</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">配料／滷汁／醬料可分成幾組。每組設「單選/複選」「必選/可不選」「結帳整單一次/點品項各自選」，選項可填加價（留白＝免費）。設好後到「菜單」每個商品裡勾要附加哪幾組。</div>
+          <div id="addon-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-sm" style="border-style:dashed;" onclick="addAddonGroup()">＋ 新增一組</button>
+            <button class="btn btn-sm" style="margin-left:auto;background:var(--wine);color:var(--cream);" onclick="saveAddonGroups()">儲存加料設定</button>
+          </div>
+        </div></div>
+      </div>
+
       <div class="scard" id="sc-shopinfo">
         <div class="scard-h" onclick="toggleCard('sc-shopinfo',event)">
           <i class="ic">🏪</i><span class="t">店家資訊頁</span><span class="scope-tag scope-all">全店共用</span>
@@ -2782,6 +2822,17 @@ function renderMenu(){
               <span class="u">元</span>
               ${(p.vars||[]).length>1? `<button class="mini-del" onclick="delVar(${idx},${vi})" title="刪除規格">✕</button>`:""}
             </div>`).join("")}
+          <div class="pa-wrap">
+            <div class="pa-h">🧂 加料選項（勾要附加哪幾組；群組在「設定 → 加料設定」先建立）</div>
+            ${ADDONS.length
+              ? ADDONS.map(g=>{ const on=(p.addons||[]).indexOf(g.id)>-1;
+                  return `<div class="pa-row ${on?"on":""}" onclick="toggleProdAddon(${idx},'${g.id}',this)">
+                    <span class="pa-cbx">${on?"✓":""}</span>
+                    <span class="pa-nm">${esc(g.name)}</span>
+                    <span class="pa-md">${g.scope==="order"?"整單":"點品項"}・${g.mode==="one"?"擇一":"複選"}${g.req?"・必選":""}</span>
+                  </div>`; }).join("")
+              : `<div class="pa-empty">還沒有加料群組。先到「設定 → 加料設定」新增群組，再回來勾。</div>`}
+          </div>
           <div style="display:flex;gap:8px;margin-top:10px;">
             <button class="btn" style="background:none;border:1px solid var(--wine);color:var(--wine);padding:6px 12px;font-size:12.5px;" onclick="addVar(${idx})">＋ 新增規格</button>
             <button class="btn" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:6px 12px;font-size:12.5px;margin-left:auto;" onclick="delItem(${idx})">🗑 刪除品項</button>
@@ -2869,6 +2920,73 @@ window.saveSauces=async function(){
   }catch(e){ console.error(e); alert("儲存失敗："+e.message); }
 };
 
+/* ===== 加料設定（多組群組） ===== */
+var ADDONS=[];
+function agEsc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+function agSeg(gi,cur,a,la,b,lb,fn){
+  return '<span class="agseg">'
+    +'<b class="'+(cur===a?"on":"")+'" onclick="'+fn+'('+gi+',\''+a+'\')">'+la+'</b>'
+    +'<b class="'+(cur===b?"on":"")+'" onclick="'+fn+'('+gi+',\''+b+'\')">'+lb+'</b></span>';
+}
+function agCard(g,gi){
+  var h='<div class="agcard">';
+  h+='<input class="agname" value="'+agEsc(g.name)+'" oninput="agName('+gi+',this.value)" placeholder="群組名稱（例：靈魂滷汁）">';
+  h+='<div class="agsegs">'
+    +'<span class="agk">選法</span>'+agSeg(gi,g.mode,'one','單選','many','複選','agMode')
+    +'<span class="agk">必填</span><span class="agseg"><b class="'+(g.req?"on":"")+'" onclick="agReq('+gi+',1)">必選</b><b class="'+(!g.req?"on":"")+'" onclick="agReq('+gi+',0)">可不選</b></span>'
+    +'<span class="agk">位置</span>'+agSeg(gi,g.scope,'order','結帳整單','item','點品項','agScope')
+    +'</div>';
+  (g.opts||[]).forEach(function(o,oi){
+    h+='<div class="agorow"><input class="agon" value="'+agEsc(o.n)+'" oninput="agOptName('+gi+','+oi+',this.value)" placeholder="選項名稱">'
+      +'<input class="agop" type="number" min="0" placeholder="免費" value="'+(o.p||"")+'" oninput="agOptPrice('+gi+','+oi+',this.value)">'
+      +'<button class="agdel" onclick="agDelOpt('+gi+','+oi+')">刪除</button></div>';
+  });
+  h+='<div class="agbtns"><button class="agadd" onclick="agAddOpt('+gi+')">＋ 新增選項</button>'
+    +'<button class="agdelg" onclick="agDelGroup('+gi+')">🗑 刪除整組</button></div>';
+  return h+'</div>';
+}
+function renderAddonList(){
+  var el=$("addon-list"); if(!el) return;
+  el.innerHTML = ADDONS.length ? ADDONS.map(function(g,gi){ return agCard(g,gi); }).join("")
+    : '<div class="pa-empty">尚未建立任何加料群組，按下方「＋ 新增一組」開始。</div>';
+}
+window.agName=function(gi,v){ if(ADDONS[gi]) ADDONS[gi].name=v; };
+window.agMode=function(gi,v){ if(ADDONS[gi]){ ADDONS[gi].mode=v; renderAddonList(); } };
+window.agReq=function(gi,v){ if(ADDONS[gi]){ ADDONS[gi].req=!!(+v); renderAddonList(); } };
+window.agScope=function(gi,v){ if(ADDONS[gi]){ ADDONS[gi].scope=v; renderAddonList(); } };
+window.agOptName=function(gi,oi,v){ if(ADDONS[gi]&&ADDONS[gi].opts[oi]) ADDONS[gi].opts[oi].n=v; };
+window.agOptPrice=function(gi,oi,v){ if(ADDONS[gi]&&ADDONS[gi].opts[oi]) ADDONS[gi].opts[oi].p=Math.max(0,Math.floor(+v||0)); };
+window.agAddOpt=function(gi){ if(ADDONS[gi]){ ADDONS[gi].opts=ADDONS[gi].opts||[]; ADDONS[gi].opts.push({n:"新選項",p:0}); renderAddonList(); } };
+window.agDelOpt=function(gi,oi){ if(ADDONS[gi]){ ADDONS[gi].opts.splice(oi,1); renderAddonList(); } };
+window.addAddonGroup=function(){ ADDONS.push({id:"ag"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),name:"新群組",mode:"many",req:false,scope:"order",opts:[{n:"新選項",p:0}]}); renderAddonList(); };
+window.agDelGroup=function(gi){ if(!confirm("刪除整組？（商品上勾選這組的會一併失效）")) return; ADDONS.splice(gi,1); renderAddonList(); };
+window.saveAddonGroups=async function(){
+  var clean=ADDONS.map(function(g){ return {
+    id: g.id||("ag"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36)),
+    name: (g.name||"").trim()||"未命名群組",
+    mode: g.mode==="one"?"one":"many",
+    req: !!g.req,
+    scope: g.scope==="item"?"item":"order",
+    opts: (g.opts||[]).filter(function(o){ return (o.n||"").trim()!==""; }).map(function(o){ return {n:(o.n||"").trim(), p:Math.max(0,Math.floor(+o.p||0))}; })
+  }; });
+  try{
+    await setDoc(doc(db,"settings","global"),{addonGroups:clean},{merge:true});
+    ADDONS=JSON.parse(JSON.stringify(clean)); GLOBAL.addonGroups=JSON.parse(JSON.stringify(clean));
+    renderAddonList();
+    if(typeof renderMenu==="function" && Array.isArray(PRODUCTS) && PRODUCTS.length) renderMenu();
+    toast("加料設定已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+(e.message||"")); }
+};
+window.toggleProdAddon=async function(idx,gid,rowEl){
+  var p=PRODUCTS[idx]; if(!p) return;
+  p.addons=(p.addons||[]).slice();
+  var i=p.addons.indexOf(gid), on;
+  if(i>-1){ p.addons.splice(i,1); on=false; } else { p.addons.push(gid); on=true; }
+  if(rowEl){ rowEl.classList.toggle("on",on); var cb=rowEl.querySelector(".pa-cbx"); if(cb) cb.textContent=on?"✓":""; }
+  try{ await updateDoc(doc(db,"products",p.docId),{addons:p.addons}); }
+  catch(e){ console.error(e); alert("加料選項儲存失敗："+(e.message||"")); }
+};
+
 /* 邀請好友 */
 function renderReferral(){
   const r=GLOBAL.referral||{}; const sw=$("sw-referral"); if(sw) sw.classList.toggle("on",!!r.on);
@@ -2917,6 +3035,7 @@ function initNewSettingCards(){
   renderPointRule();
   REDEEM_CATALOG=JSON.parse(JSON.stringify(GLOBAL.redeemCatalog||[])); renderRedeemList();
   SAUCES=[...(GLOBAL.sauces||["招牌蒜蓉醬","原味老滷","微甜辣老滷"])]; renderSaucesList();
+  ADDONS=JSON.parse(JSON.stringify(GLOBAL.addonGroups||[])); renderAddonList();
   renderReferral();
   LEVELS_EDIT=JSON.parse(JSON.stringify((GLOBAL.levels&&GLOBAL.levels.length)?GLOBAL.levels:[
     {name:"初入江湖",icon:"🥢",minSpend:0,perks:"入會送贈品・生日當月訂購加贈驚喜包"},
