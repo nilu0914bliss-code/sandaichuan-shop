@@ -397,6 +397,44 @@
         </div></div>
       </div>
 
+      <!-- 線上付款（各通路獨立） -->
+      <div class="scard" id="sc-pay">
+        <div class="scard-h" onclick="toggleCard('sc-pay',event)">
+          <i class="ic">💳</i><span class="t">線上付款</span><span class="scope-tag scope-ch">此通路</span>
+          <span class="sbadge" id="badge-pay"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="sw-row"><span class="l">信用卡 / LINE Pay</span><button class="switch" id="sw-onlinePay"></button></div>
+          <div class="hint">開啟後，此通路的客人可選線上付款。金流部署完成前請保持關閉。</div>
+        </div></div>
+      </div>
+
+      <!-- 運費設定（僅宅配通路顯示） -->
+      <div class="scard" id="sc-ship" style="display:none;">
+        <div class="scard-h" onclick="toggleCard('sc-ship',event)">
+          <i class="ic">🚚</i><span class="t">運費設定</span><span class="scope-tag scope-ch">此通路</span>
+          <span class="sbadge" id="badge-ship"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">宅配訂單的運費規則。自取通路免運，不會顯示這張卡。</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <span style="font-size:13px;color:var(--ink);">運費</span>
+            <input type="number" id="ship-fee" min="0" value="160" style="width:100px;">
+            <span style="font-size:13px;color:var(--ink);">元</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;color:var(--ink);">消費滿</span>
+            <input type="number" id="ship-free" min="0" value="1000" style="width:100px;">
+            <span style="font-size:13px;color:var(--ink);">元免運（設 0 = 不提供免運）</span>
+          </div>
+          <div class="hint" id="ship-preview" style="margin-top:8px;"></div>
+        </div></div>
+      </div>
+
+
+      <!-- ═══ 全店共用 ═══ -->
+      <div class="set-group-title scope-all" style="grid-column:1/-1;">🌐 全店共用設定</div>
+
       <!-- 優惠券（預設收起） -->
       <div class="scard" id="sc-cp">
         <div class="scard-h" onclick="toggleCard('sc-cp',event)">
@@ -513,44 +551,6 @@
           </div>
         </div></div>
       </div>
-
-      <!-- 線上付款（各通路獨立） -->
-      <div class="scard" id="sc-pay">
-        <div class="scard-h" onclick="toggleCard('sc-pay',event)">
-          <i class="ic">💳</i><span class="t">線上付款</span><span class="scope-tag scope-ch">此通路</span>
-          <span class="sbadge" id="badge-pay"></span><span class="arr">▾</span>
-        </div>
-        <div class="scard-b"><div class="inner">
-          <div class="sw-row"><span class="l">信用卡 / LINE Pay</span><button class="switch" id="sw-onlinePay"></button></div>
-          <div class="hint">開啟後，此通路的客人可選線上付款。金流部署完成前請保持關閉。</div>
-        </div></div>
-      </div>
-
-      <!-- 運費設定（僅宅配通路顯示） -->
-      <div class="scard" id="sc-ship" style="display:none;">
-        <div class="scard-h" onclick="toggleCard('sc-ship',event)">
-          <i class="ic">🚚</i><span class="t">運費設定</span><span class="scope-tag scope-ch">此通路</span>
-          <span class="sbadge" id="badge-ship"></span><span class="arr">▾</span>
-        </div>
-        <div class="scard-b"><div class="inner">
-          <div class="hint" style="margin:0 0 10px;">宅配訂單的運費規則。自取通路免運，不會顯示這張卡。</div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-            <span style="font-size:13px;color:var(--ink);">運費</span>
-            <input type="number" id="ship-fee" min="0" value="160" style="width:100px;">
-            <span style="font-size:13px;color:var(--ink);">元</span>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:13px;color:var(--ink);">消費滿</span>
-            <input type="number" id="ship-free" min="0" value="1000" style="width:100px;">
-            <span style="font-size:13px;color:var(--ink);">元免運（設 0 = 不提供免運）</span>
-          </div>
-          <div class="hint" id="ship-preview" style="margin-top:8px;"></div>
-        </div></div>
-      </div>
-
-
-      <!-- ═══ 全店共用 ═══ -->
-      <div class="set-group-title scope-all" style="grid-column:1/-1;">🌐 全店共用設定</div>
 
       <div class="scard" id="sc-pointrule">
         <div class="scard-h" onclick="toggleCard('sc-pointrule',event)">
@@ -2358,7 +2358,7 @@ async function saveDesc(idx){
   if(val === undefined) return;
   const p = PRODUCTS[idx];
   if(val.trim() === (p.desc||"").trim()){ delete nameEdits["d-"+idx]; return; }
-  try{ await updateDoc(doc(db,"products",p.docId), {desc: val.trim().slice(0,60)}); toast("商品介紹已更新"); }
+  try{ await updateDoc(doc(db,"products",p.docId), {desc: val.trim().slice(0,100)}); toast("商品介紹已更新"); }
   catch(e){ console.error(e); alert("介紹儲存失敗：" + (e.message||"")); }
   delete nameEdits["d-"+idx];
 }
@@ -2608,10 +2608,10 @@ function renderMenu(){
           </div>
           <div style="margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);">
             <label style="display:block;font-size:11.5px;color:var(--wine);font-weight:800;letter-spacing:1px;margin-bottom:5px;">商品介紹</label>
-            <textarea id="desc-${idx}" maxlength="60" placeholder="例：選用溫體放山土雞，以海鹽與蔥薑低溫慢浸，肉質緊實不柴。"
+            <textarea id="desc-${idx}" maxlength="100" placeholder="例：選用溫體放山土雞，以海鹽與蔥薑低溫慢浸，肉質緊實不柴。"
               oninput="editDesc(${idx}, this.value)" onblur="saveDesc(${idx})"
               style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#FCFAF3;resize:vertical;min-height:56px;line-height:1.55;">${(p.desc||"").replace(/</g,"&lt;")}</textarea>
-            <div class="hint" style="text-align:right;margin:3px 0 0;"><span id="desccnt-${idx}">${(p.desc||"").length}</span> / 60 字</div>
+            <div class="hint" style="text-align:right;margin:3px 0 0;"><span id="desccnt-${idx}">${(p.desc||"").length}</span> / 100 字</div>
             <div class="hint" style="margin:2px 0 0;">留空就不會顯示在客人的點餐頁。三個通路共用（跟品名、照片一樣）。</div>
           </div>
           <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);">
