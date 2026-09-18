@@ -665,22 +665,6 @@
         </div></div>
       </div>
 
-      <div class="scard" id="sc-sauces">
-        <div class="scard-h" onclick="toggleCard('sc-sauces',event)">
-          <i class="ic">🫙</i><span class="t">靈魂滷汁選項</span><span class="scope-tag scope-all">全店共用</span>
-          <span class="arr">▾</span>
-        </div>
-        <div class="scard-b"><div class="inner">
-          <div class="hint" style="margin:0 0 10px;">客人結帳時看到的滷汁選項，可改名、刪除、新增。</div>
-          <div id="sauces-list"></div>
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <input id="sauce-new" placeholder="新滷汁名稱" style="flex:1;min-width:110px;">
-            <button class="btn btn-sm" onclick="addSauce()">＋ 新增</button>
-            <button class="btn btn-sm" onclick="saveSauces()">儲存</button>
-          </div>
-        </div></div>
-      </div>
-
       <style>
         .agcard{border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:#FCFAF3;}
         .agname{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-weight:800;font-size:14px;font-family:inherit;background:#fff;margin-bottom:8px;box-sizing:border-box;}
@@ -706,17 +690,32 @@
         .pa-md{font-size:10.5px;color:var(--ink-soft);}
         .pa-empty{font-size:11.5px;color:var(--ink-soft);}
       </style>
-      <div class="scard" id="sc-addons">
-        <div class="scard-h" onclick="toggleCard('sc-addons',event)">
-          <i class="ic">🧂</i><span class="t">加料設定</span><span class="scope-tag scope-all">全店共用</span>
+      <div class="scard" id="sc-addons-order">
+        <div class="scard-h" onclick="toggleCard('sc-addons-order',event)">
+          <i class="ic">🥘</i><span class="t">滷味加料（結帳時整單選一次）</span><span class="scope-tag scope-all">全店共用</span>
           <span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
-          <div class="hint" style="margin:0 0 10px;">配料／滷汁／醬料可分成幾組。每組設「單選/複選」「必選/可不選」「結帳整單一次/點品項各自選」，選項可填加價（留白＝免費）。設好後到「菜單」每個商品裡勾要附加哪幾組。</div>
-          <div id="addon-list"></div>
+          <div class="hint" style="margin:0 0 10px;">客人買滷味、在結帳那一步「整筆訂單」選一次的東西（佐料、滷汁、醬料）。可分幾個分類，每個分類設「單選／複選」「必選／可不選」，選項可填加價（留白＝免費）。設好後到「菜單」把分類勾到滷味商品上。</div>
+          <div id="addon-list-order"></div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <button class="btn btn-sm" style="border-style:dashed;" onclick="addAddonGroup()">＋ 新增一組</button>
-            <button class="btn btn-sm" style="margin-left:auto;background:var(--wine);color:var(--cream);" onclick="saveAddonGroups()">儲存加料設定</button>
+            <button class="btn btn-sm" style="border-style:dashed;" onclick="addAddonGroup('order')">＋ 新增分類</button>
+            <button class="btn btn-sm" style="margin-left:auto;background:var(--wine);color:var(--cream);" onclick="saveAddonGroups()">儲存滷味加料</button>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="scard" id="sc-addons-item">
+        <div class="scard-h" onclick="toggleCard('sc-addons-item',event)">
+          <i class="ic">🍗</i><span class="t">雞肉品項加料（點品項各自選）</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">像雞肉那種、客人「點進品項時」各自勾的配料。結構跟上面一樣（分類＋選項＋單選/複選/必選），只是出現在點品項時，不是結帳時。設好後到「菜單」把分類勾到雞肉商品上。</div>
+          <div id="addon-list-item"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-sm" style="border-style:dashed;" onclick="addAddonGroup('item')">＋ 新增分類</button>
+            <button class="btn btn-sm" style="margin-left:auto;background:var(--wine);color:var(--cream);" onclick="saveAddonGroups()">儲存雞肉加料</button>
           </div>
         </div></div>
       </div>
@@ -2935,7 +2934,6 @@ function agCard(g,gi){
   h+='<div class="agsegs">'
     +'<span class="agk">選法</span>'+agSeg(gi,g.mode,'one','單選','many','複選','agMode')
     +'<span class="agk">必填</span><span class="agseg"><b class="'+(g.req?"on":"")+'" onclick="agReq('+gi+',1)">必選</b><b class="'+(!g.req?"on":"")+'" onclick="agReq('+gi+',0)">可不選</b></span>'
-    +'<span class="agk">位置</span>'+agSeg(gi,g.scope,'order','結帳整單','item','點品項','agScope')
     +'</div>';
   (g.opts||[]).forEach(function(o,oi){
     h+='<div class="agorow"><input class="agon" value="'+agEsc(o.n)+'" oninput="agOptName('+gi+','+oi+',this.value)" placeholder="選項名稱">'
@@ -2947,9 +2945,11 @@ function agCard(g,gi){
   return h+'</div>';
 }
 function renderAddonList(){
-  var el=$("addon-list"); if(!el) return;
-  el.innerHTML = ADDONS.length ? ADDONS.map(function(g,gi){ return agCard(g,gi); }).join("")
-    : '<div class="pa-empty">尚未建立任何加料群組，按下方「＋ 新增一組」開始。</div>';
+  var elO=$("addon-list-order"), elI=$("addon-list-item"); if(!elO && !elI) return;
+  var oHtml="", iHtml="";
+  ADDONS.forEach(function(g,gi){ if(g.scope==="item"){ iHtml+=agCard(g,gi); } else { oHtml+=agCard(g,gi); } });
+  if(elO) elO.innerHTML = oHtml || '<div class="pa-empty">還沒有分類，按下方「＋ 新增分類」開始。</div>';
+  if(elI) elI.innerHTML = iHtml || '<div class="pa-empty">還沒有分類，按下方「＋ 新增分類」開始。</div>';
 }
 window.agName=function(gi,v){ if(ADDONS[gi]) ADDONS[gi].name=v; };
 window.agMode=function(gi,v){ if(ADDONS[gi]){ ADDONS[gi].mode=v; renderAddonList(); } };
@@ -2959,7 +2959,7 @@ window.agOptName=function(gi,oi,v){ if(ADDONS[gi]&&ADDONS[gi].opts[oi]) ADDONS[g
 window.agOptPrice=function(gi,oi,v){ if(ADDONS[gi]&&ADDONS[gi].opts[oi]) ADDONS[gi].opts[oi].p=Math.max(0,Math.floor(+v||0)); };
 window.agAddOpt=function(gi){ if(ADDONS[gi]){ ADDONS[gi].opts=ADDONS[gi].opts||[]; ADDONS[gi].opts.push({n:"新選項",p:0}); renderAddonList(); } };
 window.agDelOpt=function(gi,oi){ if(ADDONS[gi]){ ADDONS[gi].opts.splice(oi,1); renderAddonList(); } };
-window.addAddonGroup=function(){ ADDONS.push({id:"ag"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),name:"新群組",mode:"many",req:false,scope:"order",opts:[{n:"新選項",p:0}]}); renderAddonList(); };
+window.addAddonGroup=function(scope){ ADDONS.push({id:"ag"+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36),name:"新分類",mode:"many",req:false,scope:(scope==="item"?"item":"order"),opts:[{n:"新選項",p:0}]}); renderAddonList(); };
 window.agDelGroup=function(gi){ if(!confirm("刪除整組？（商品上勾選這組的會一併失效）")) return; ADDONS.splice(gi,1); renderAddonList(); };
 window.saveAddonGroups=async function(){
   var clean=ADDONS.map(function(g){ return {
