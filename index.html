@@ -66,8 +66,8 @@
   .si-text{font-size:13.5px;line-height:1.95;color:var(--ink);white-space:pre-wrap;}
   .si-vwrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;}
   .si-vwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
-  .si-vwrap-ig{position:relative;width:100%;max-width:420px;margin:0 auto;padding-top:150%;border-radius:10px;overflow:hidden;background:#fff;border:1px solid var(--line);}
-  .si-vwrap-ig iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .si-vwrap-ig{width:100%;max-width:420px;margin:0 auto;border-radius:10px;overflow:hidden;background:#fff;border:1px solid var(--line);}
+  .si-vwrap-ig iframe{width:100%;height:640px;border:0;display:block;}
   .si-vlink{color:var(--wine);font-weight:700;text-decoration:none;}
   .si-photo{width:100%;border-radius:10px;display:block;}
   .ph-img{cursor:zoom-in;}
@@ -680,7 +680,18 @@ function shopEmbed(url){
   if(/facebook\.com|fb\.watch/.test(url)) return "https://www.facebook.com/plugins/video.php?href="+encodeURIComponent(url)+"&show_text=false";
   return "";
 }
+function igAutoResize(){
+  if(window.__igResizeInit) return; window.__igResizeInit=true;
+  window.addEventListener("message",function(ev){
+    if(String(ev.origin).indexOf("instagram.com")<0) return;
+    var d; try{ d=(typeof ev.data==="string")?JSON.parse(ev.data):ev.data; }catch(e){ return; }
+    if(!d||d.type!=="MEASURE"||!d.details||!d.details.height) return;
+    var ifr=document.querySelectorAll("#shopinfo-body .si-vwrap-ig iframe");
+    for(var i=0;i<ifr.length;i++){ if(ifr[i].contentWindow===ev.source){ ifr[i].style.height=d.details.height+"px"; } }
+  });
+}
 function renderShopInfo(){
+  igAutoResize();
   var el=document.getElementById("shopinfo-body"); if(!el) return;
   var blocks=(SETTINGS.shopInfo && Array.isArray(SETTINGS.shopInfo.blocks))? SETTINGS.shopInfo.blocks : [];
   if(!blocks.length){ el.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:14px;line-height:2;">店家資訊內容<br>敬請期待</div>'; return; }
