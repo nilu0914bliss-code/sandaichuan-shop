@@ -1615,6 +1615,7 @@ function startData(){
   setInterval(()=>{ if(!document.hidden && openSet.size===0) refetch(); }, 5000);
   loadMenu();
   loadSettings();
+  loadStock();
   (async ()=>{
     await loadMembers();
     renderCpCh(); countTargets(); loadCoupons();
@@ -2583,6 +2584,25 @@ window.saveRedeemCatalog=async function(){
 window.addVar=addVar; window.delVar=delVar; window.addItem=addItem; window.delItem=delItem;
 window.moveItem=moveItem;
 
+async function loadStock(){
+  try{
+    const snap=await getDocs(collection(db,"counters"));
+    const m={};
+    snap.forEach(d=>{ const x=d.data(); if(x&&x.kind==="stock"){ m[d.id]=x.n; } });
+    window.STOCK=m;
+    if(typeof renderMenu==="function" && Array.isArray(PRODUCTS) && PRODUCTS.length) renderMenu();
+  }catch(e){ console.error("讀取庫存失敗", e); }
+}
+window.loadStock=loadStock;
+function stockField(p, idx){
+  var key="stk_"+p.docId+"_"+EDIT_CH;
+  var v=(window.STOCK && window.STOCK[key]!=null)? window.STOCK[key] : "";
+  return '<div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">'
+    +'<span class="vl" style="font-weight:700;color:var(--ink);">總庫存<span style="font-weight:400;color:var(--ink-soft);font-size:11px;margin-left:4px;">（此通路・賣完為止・留空＝不限）</span></span>'
+    +'<input type="number" min="0" placeholder="不限" value="'+v+'" id="lim-'+idx+'" oninput="markDirty('+idx+')">'
+    +'<span class="u">份</span></div>';
+}
+window.stockField=stockField;
 function renderMenu(){
   const cur = CH.find(c=>c.k===EDIT_CH) || CH[0];
   let html = `<div class="ch-note">目前編輯：<b style="color:var(--wine);">${cur.n}</b>　價格、售完、限量都只影響這個通路。<br>照片與品項名稱三個通路共用。<br><span style="color:var(--ink-soft);">點分類展開／收起；展開後可拖拉品項或用 ▲▼ 調順序。</span></div>`;
@@ -2669,12 +2689,7 @@ function renderMenu(){
                 outline:${(p.tagColor||'rose')===c?'3px solid var(--ink)':'none'};outline-offset:2px;"></span>`).join('')}
             </div>
           </div>
-          ${cur.type==="pickup" ? `
-          <div class="vr" style="background:var(--cream-soft);border-radius:4px;padding:6px 8px;margin-top:8px;">
-            <span class="vl" style="font-weight:700;color:var(--ink);">每日限量</span>
-            <input type="number" min="0" placeholder="不限" value="${d.limit}" id="lim-${idx}" oninput="markDirty(${idx})">
-            <span class="u">份</span>
-          </div>` : ""}
+          ${cur.type==="pickup" ? stockField(p, idx) : ""}
           ${(p.vars||[]).map((v,vi)=>`
             <div class="vr">
               <input class="vname-input" value="${(v.v||"").replace(/"/g,'&quot;')}" placeholder="規格（如：全雞）"
@@ -2727,9 +2742,16 @@ $("btn-save-menu").onclick = async ()=>{
     const prices = (p.vars||[]).map((v,vi)=> +($("pr-"+idx+"-"+vi).value || 0));
     const payload = {};
     payload["ch."+EDIT_CH+".prices"] = prices;
-    if(cur.type==="pickup") payload["ch."+EDIT_CH+".limit"] = (limRaw===""? null : +limRaw);
-    try{ await updateDoc(doc(db,"products",p.docId), payload); ok++; }
-    catch(e){ console.error("儲存菜單失敗", e); lastErr = e; }
+    try{
+      await updateDoc(doc(db,"products",p.docId), payload);
+      if(cur.type==="pickup"){
+        const _k="stk_"+p.docId+"_"+EDIT_CH;
+        const _n=(limRaw===""? null : Math.max(0, Math.floor(+limRaw)));
+        await setDoc(doc(db,"counters",_k), {n:_n, kind:"stock", product:p.docId, ch:EDIT_CH}, {merge:true});
+        window.STOCK=window.STOCK||{}; window.STOCK[_k]=_n;
+      }
+      ok++;
+    }catch(e){ console.error("儲存菜單失敗", e); lastErr = e; }
   }
   dirty.clear();
   if(lastErr){
