@@ -790,6 +790,7 @@ $("btn-mode").onclick = ()=>{
 $("mt-orders").onclick = ()=>setView("orders");
 $("mt-menu").onclick = ()=>setView("menu");
 $("mt-set").onclick = ()=>setView("set");
+$("mt-member").onclick = ()=>setView("member");
 function setView(v){
   ["orders","menu","set","member"].forEach(x=>{
     $("v-"+x).classList.toggle("show", x===v);
