@@ -1511,9 +1511,11 @@ $("btn-save-set").onclick = async ()=>{
     await setDoc(doc(db,"settings","global"), {
       signupGift: GLOBAL.signupGift,
       pointRule:  GLOBAL.pointRule,
-      referral:   GLOBAL.referral
+      referral:   GLOBAL.referral,
+      shopInfo:   { blocks: SHOPINFO }
     }, {merge:true});
-    renderSignupGift();
+    GLOBAL.shopInfo = { blocks: JSON.parse(JSON.stringify(SHOPINFO)) };
+    renderSignupGift(); renderShopInfo();
     toast("已儲存（" + cur.n + "）");
   }catch(e){
     console.error("儲存設定失敗", e);
