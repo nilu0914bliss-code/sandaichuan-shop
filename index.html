@@ -655,9 +655,7 @@ function groupById(gid){ return AGROUPS().find(function(g){ return g.id===gid; }
 function aesc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
 function itemAddonGroups(it){ return (it && Array.isArray(it.addons))? AGROUPS().filter(function(g){ return g.scope==="item" && it.addons.indexOf(g.id)>-1; }) : []; }
 function orderAddonGroups(){
-  var ids={};
-  for(var k in cart){ if(cart[k]>0){ var it=findItem(k.split("|")[0]); if(it && it.addons) it.addons.forEach(function(x){ ids[x]=1; }); } }
-  return AGROUPS().filter(function(g){ return g.scope==="order" && ids[g.id]; });
+  return AGROUPS().filter(function(g){ return g.scope==="order"; });
 }
 function optOn(sel,g,oi){ if(sel==null) return false; return g.mode==="one"? (sel===oi) : !!(sel && sel[oi]); }
 function selSum(sel,g){ var s=0; if(sel==null) return 0; if(g.mode==="one"){ if(typeof sel==="number" && g.opts[sel]) s+=(g.opts[sel].p||0); } else { for(var oi in sel){ if(sel[oi] && g.opts[oi]) s+=(g.opts[oi].p||0); } } return s; }
