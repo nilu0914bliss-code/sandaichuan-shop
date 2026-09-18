@@ -55,6 +55,12 @@
   .item::before{content:"";position:absolute;inset:4px;border:1px solid var(--line);border-radius:4px;pointer-events:none;opacity:.55;}
   .item .name{font-size:15.5px;font-weight:700;letter-spacing:1px;}
   .item .pdesc{font-size:12px;color:var(--ink-soft);line-height:1.55;margin-top:4px;white-space:pre-wrap;}
+  .cat-desc{font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:-4px 0 12px;background:var(--cream-soft);border-radius:8px;padding:10px 12px;white-space:pre-wrap;}
+  .ph-img{cursor:zoom-in;}
+  .lb{position:fixed;inset:0;background:rgba(20,12,8,.9);display:none;align-items:center;justify-content:center;padding:24px;z-index:9999;}
+  .lb.on{display:flex;}
+  .lb img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .lb .x{position:absolute;top:14px;right:16px;color:#fff;font-size:30px;line-height:1;width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
   .item-tag{display:inline-block;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:700;margin:4px 0 5px;}
   .item-tag-rose{background:#FFF0F3;color:#C05070;border:1px solid #E8A0AA;}
   .item-tag-gold{background:#FFF8EC;color:#996A00;border:1px solid #E8C070;}
@@ -571,6 +577,7 @@ function rebuildProducts(){
   const k = MY_CH || "fs";
   const out = RAW_PRODUCTS.map(c=>({
     cat: c.cat,
+    catDesc: (SETTINGS.catDesc||{})[c.cat] || "",
     items: c.items.filter(p=>{ const cd=(p.ch&&p.ch[k])||{}; return cd.hidden!==true; }).map(p=>{
       const cd = (p.ch && p.ch[k]) || {};
       return {
@@ -622,10 +629,11 @@ function setCat(i){ activeCat=i; renderCats();
 function renderMenu(){
   $("menu").innerHTML = PRODUCTS.map(s=>`
     <div class="sec-title">${s.cat}</div>
+    ${s.catDesc? `<div class="cat-desc">${s.catDesc.replace(/</g,"&lt;")}</div>` : ""}
     ${s.items.map(it=>`
       <div class="item ${it.sold?"sold":""}">
         ${it.img
-          ? `<img class="ph-img" src="${it.img}" alt="${it.n}">`
+          ? `<img class="ph-img" src="${it.img}" alt="${it.n}" onclick="zoomImg(this.src)">`
           : `<div class="ph"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="12" cy="13" rx="9" ry="5.5"/><ellipse cx="12" cy="12" rx="6" ry="3.4"/></svg>照片準備中</div>`}
         <div class="main">
         <div class="name">${it.n}${it.sold? `<span class="sold-tag">本處售完</span>`:""}</div>
@@ -645,6 +653,8 @@ function renderMenu(){
       </div>`).join("")}`).join("")
   ;
 }
+function zoomImg(src){ if(!src) return; document.getElementById("lb-zoom-img").src=src; document.getElementById("lb-zoom").classList.add("on"); }
+function closeZoom(){ document.getElementById("lb-zoom").classList.remove("on"); }
 function requireLogin(){
   if(member) return true;
   if(confirm("請先用 LINE 登入才能訂購。\n\n登入後可查詢訂單、累積點數與享生日禮。\n現在要登入嗎？")){
@@ -1958,5 +1968,6 @@ if(cfg.apiKey && cfg.projectId){
   </div>
 </div>
 <style>#redeem-modal.on{display:flex !important;}</style>
+<div class="lb" id="lb-zoom" onclick="closeZoom()"><span class="x">×</span><img id="lb-zoom-img" alt=""></div>
 </body>
 </html>
