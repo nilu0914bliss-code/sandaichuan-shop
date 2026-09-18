@@ -344,6 +344,14 @@
 </div>
 
 <!-- ══════ 頁2：購物車 ══════ -->
+<div class="page" id="p-shop">
+  <div class="topbar">
+    <button class="back" onclick="go('p-menu')">‹</button>
+    <h2>店家資訊</h2>
+  </div>
+  <div style="padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:14px;line-height:2;">店家資訊內容<br>敬請期待</div>
+</div>
+
 <div class="page" id="p-cart">
   <div class="topbar">
     <button class="back" onclick="go('p-menu')">‹</button>
@@ -488,6 +496,7 @@
   <button id="nv-home" class="nv on" onclick="nav('home')"><span class="ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg></span>首頁</button>
   <button id="nv-cart" class="nv" onclick="nav('cart')"><span class="ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 4h2.4l2.4 11.4h10.4L21 7H6.4"/><circle cx="10" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></svg><span class="bdg" id="cart-bdg" style="display:none;">0</span></span>購物車</button>
   <button id="nv-member" class="nv" onclick="nav('member')"><span class="ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20c1.5-3.8 4.6-5.3 7.2-5.3s5.7 1.5 7.2 5.3"/></svg></span>會員</button>
+  <button id="nv-shop" class="nv" onclick="nav('shop')"><span class="ic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none"/></svg></span>店家資訊</button>
 </nav>
 
 <script>
@@ -700,7 +709,7 @@ function go(p){
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("show"));
   $(p).classList.add("show"); window.scrollTo(0,0);
   const mb=$("minibar"); if(mb) mb.style.display = (p==="p-menu")?"flex":"none";
-  const map={"p-menu":"nv-home","p-cart":"nv-cart","p-member":"nv-member","p-odetail":"nv-member","p-login":"nv-member"};
+  const map={"p-menu":"nv-home","p-cart":"nv-cart","p-member":"nv-member","p-odetail":"nv-member","p-login":"nv-member","p-shop":"nv-shop"};
   document.querySelectorAll(".nv").forEach(b=>b.classList.remove("on"));
   if(map[p]) $(map[p]).classList.add("on");
 }
@@ -708,6 +717,7 @@ function nav(t){
   if(t==="home"){ go("p-menu"); }
   else if(t==="cart"){ renderCart(); go("p-cart"); }
   else if(t==="member"){ memberEntry(); }
+  else if(t==="shop"){ go("p-shop"); }
 }
 /* 店家設定：從資料庫 settings/shop 載入；載入前用保守預設（僅自取＋現金） */
 let SETTINGS = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[], sauces:["招牌蒜蓉醬","原味老滷","微甜辣老滷"], levels:[], redeemCatalog:[], pointRule:{on:false,spendPer:100,ptsGet:1}, referral:{on:false} };
