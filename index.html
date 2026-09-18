@@ -66,6 +66,8 @@
   .si-text{font-size:13.5px;line-height:1.95;color:var(--ink);white-space:pre-wrap;}
   .si-vwrap{position:relative;width:100%;padding-top:56.25%;border-radius:10px;overflow:hidden;background:#000;}
   .si-vwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .si-vwrap-ig{position:relative;width:100%;max-width:420px;margin:0 auto;padding-top:150%;border-radius:10px;overflow:hidden;background:#fff;border:1px solid var(--line);}
+  .si-vwrap-ig iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
   .si-vlink{color:var(--wine);font-weight:700;text-decoration:none;}
   .si-photo{width:100%;border-radius:10px;display:block;}
   .ph-img{cursor:zoom-in;}
@@ -692,7 +694,8 @@ function renderShopInfo(){
       return '<div class="si-card"><div class="si-t">🏪 基本資訊</div>'+r+'</div>';
     }
     if(b.type==="video"){ var src=shopEmbed(b.url);
-      var inner=src? '<div class="si-vwrap"><iframe src="'+src+'" allowfullscreen loading="lazy" scrolling="no"></iframe></div>'
+      var wc=(src&&src.indexOf("instagram")>-1)?"si-vwrap-ig":"si-vwrap";
+      var inner=src? '<div class="'+wc+'"><iframe src="'+src+'" allowfullscreen loading="lazy" scrolling="no"></iframe></div>'
         : (b.url? '<a class="si-vlink" href="'+e(b.url)+'" target="_blank" rel="noopener">▶ 點我看影片</a>':'');
       return '<div class="si-card">'+(b.title?'<div class="si-t">🎬 '+e(b.title)+'</div>':'')+inner+'</div>';
     }
