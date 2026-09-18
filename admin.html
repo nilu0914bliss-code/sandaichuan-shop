@@ -2286,6 +2286,17 @@ window.toggleHideCat = async (cat)=>{
   s.catHidden=hid; await persistChSet();
   toast(i>=0?(cat+" 已改為顯示"):(cat+" 已隱藏（此通路）")); renderMenu();
 };
+window.saveCatDesc = async (cat, val)=>{
+  const v = (val||"").trim().slice(0,200);
+  if(((GLOBAL.catDesc&&GLOBAL.catDesc[cat])||"") === v) return;
+  const map = Object.assign({}, GLOBAL.catDesc||{});
+  map[cat] = v;
+  try{
+    await setDoc(doc(db,"settings","global"), {catDesc: map}, {merge:true});
+    GLOBAL.catDesc = map;
+    toast(v? (cat+" 分類介紹已更新") : (cat+" 分類介紹已清除"));
+  }catch(e){ console.error("分類介紹儲存失敗", e); alert("儲存失敗："+(e.message||"")); }
+};
 window.toggleHideItem = async idx=>{
   const p = PRODUCTS[idx];
   const cur = chData(p).hidden;
@@ -2576,7 +2587,8 @@ function renderMenu(){
       + '<button class="move-b" onclick="moveCat(' + catJS + ',1)" title="分類下移">▼</button>'
       + '<button class="switch ' + (catIsHidden?"":"on") + '" style="margin-left:8px;" onclick="toggleHideCat(' + catJS + ')" title="隱藏後客人在此通路看不到整個分類"></button>'
       + '<span class="cat-count" style="margin-left:6px;">' + g.rows.length + ' 項' + (catIsHidden?"・已隱藏":"") + '</span>'
-      + '</div>';
+      + '</div>'
+      + '<div style="padding:0 2px 2px;"><textarea rows="2" maxlength="200" placeholder="分類介紹（選填，顯示在客人菜單此分類標題下；留空不顯示）" onclick="event.stopPropagation()" onblur="saveCatDesc(' + catJS + ', this.value)" style="width:100%;box-sizing:border-box;margin-top:6px;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#FCFAF3;resize:vertical;min-height:44px;line-height:1.5;">' + esc((GLOBAL.catDesc&&GLOBAL.catDesc[g.cat])||"") + '</textarea></div>';
     if(isOpen){
       html += `<div class="cat-body">`;
       g.rows.forEach(({p,idx})=>{
