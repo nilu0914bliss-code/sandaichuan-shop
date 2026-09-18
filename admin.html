@@ -513,34 +513,34 @@
 
           <div class="sw-row"><span class="l">啟用註冊禮</span><button class="switch" id="sw-signup"></button></div>
 
-          <div class="cp-fld"><label>贈禮類型</label>
-            <div class="seg" style="flex-wrap:wrap;">
-              <button class="seg-b on" id="sg-t-points" onclick="setSgType('points')">送點數</button>
-              <button class="seg-b" id="sg-t-coupon" onclick="setSgType('coupon')">送優惠券</button>
-              <button class="seg-b" id="sg-t-gift" onclick="setSgType('gift')">送贈品</button>
+          <div class="cat-title" style="margin-top:4px;">已設定的註冊禮（最多 3 份）</div>
+          <div id="sg-list"><div class="hint">尚未設定，請在下方新增。</div></div>
+
+          <div class="add-card" style="margin-top:12px;">
+            <div class="cp-fld"><label>新增一份・類型</label>
+              <div class="seg" style="flex-wrap:wrap;">
+                <button class="seg-b on" id="sg-t-amount" onclick="setSgAddType('amount')">折抵券</button>
+                <button class="seg-b" id="sg-t-percent" onclick="setSgAddType('percent')">打折券</button>
+                <button class="seg-b" id="sg-t-gift" onclick="setSgAddType('gift')">送品項</button>
+              </div>
             </div>
-          </div>
-
-          <div id="sg-points-wrap">
-            <div class="cp-fld"><label>贈送點數</label>
-              <input type="number" id="sg-points" min="0" value="30"></div>
-          </div>
-
-          <div id="sg-coupon-wrap" style="display:none;">
-            <div class="cp-fld"><label>券名稱</label>
+            <div id="sg-cpname-wrap" class="cp-fld"><label>券名稱</label>
               <input id="sg-cp-name" placeholder="例：新會員折價券"></div>
-            <div style="display:flex;gap:8px;">
-              <div class="cp-fld" style="flex:1;"><label>折抵金額</label>
-                <input type="number" id="sg-cp-value" min="1" value="50"></div>
-              <div class="cp-fld" style="flex:1;"><label>最低消費</label>
-                <input type="number" id="sg-cp-min" min="0" value="0" placeholder="0＝無門檻"></div>
+            <div id="sg-val-wrap">
+              <div style="display:flex;gap:8px;">
+                <div class="cp-fld" style="flex:1;"><label id="sg-vlabel">折抵金額</label>
+                  <input type="number" id="sg-cp-value" min="1" value="50"></div>
+                <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                  <input type="number" id="sg-cp-min" min="0" value="0" placeholder="0＝無門檻"></div>
+              </div>
             </div>
+            <div id="sg-gift-wrap" style="display:none;">
+              <div class="cp-fld"><label>贈送品項</label>
+                <select id="sg-gift"></select></div>
+            </div>
+            <button class="btn btn-sm" onclick="addSignupItem()">＋ 新增這份</button>
           </div>
 
-          <div id="sg-gift-wrap" style="display:none;">
-            <div class="cp-fld"><label>贈送品項</label>
-              <select id="sg-gift"></select></div>
-          </div>
 
           <div class="cp-fld"><label>使用期限</label>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -1326,52 +1326,82 @@ async function loadSettings(){
 }
 
 /* ── 註冊禮設定 ── */
-function setSgType(t){
-  const g = GLOBAL.signupGift || {};
-  g.type = t; GLOBAL.signupGift = g;
-  ["points","coupon","gift"].forEach(k=>{
-    const btn = document.getElementById("sg-t-"+k);
-    if(btn) btn.classList.toggle("on", k===t);
-    const wrap = document.getElementById("sg-"+k+"-wrap");
-    if(wrap) wrap.style.display = (k===t)? "block":"none";
-  });
+let SIGNUP_ITEMS = [];
+window.SG_ADD_TYPE = "amount";
+function setSgAddType(t){
+  window.SG_ADD_TYPE = t;
+  ["amount","percent","gift"].forEach(function(k){ var b=document.getElementById("sg-t-"+k); if(b) b.classList.toggle("on", k===t); });
+  var isGift = (t==="gift");
+  var cw=document.getElementById("sg-cpname-wrap"), vw=document.getElementById("sg-val-wrap"), gw=document.getElementById("sg-gift-wrap");
+  if(cw) cw.style.display = isGift? "none":"block";
+  if(vw) vw.style.display = isGift? "none":"block";
+  if(gw) gw.style.display = isGift? "block":"none";
+  var vl=document.getElementById("sg-vlabel"); if(vl) vl.textContent = (t==="percent")? "折數（例 9＝九折）" : "折抵金額";
+  if(isGift) sgFillGiftOptions();
 }
-window.setSgType = setSgType;
+window.setSgAddType = setSgAddType;
 
-function renderSignupGift(){
-  const g = GLOBAL.signupGift || {on:true,type:"points",points:30,cpName:"",cpValue:50,cpMin:0,giftPid:"",days:3};
-  const sw = document.getElementById("sw-signup");
-  if(sw) sw.classList.toggle("on", g.on!==false);
-  setV("sg-points", g.points??30);
-  setV("sg-cp-name", g.cpName||"");
-  setV("sg-cp-value", g.cpValue??50);
-  setV("sg-cp-min", g.cpMin??0);
-  setV("sg-days", g.days??3);
-  /* 贈品下拉：用現有商品填 */
-  const sel = document.getElementById("sg-gift");
+function sgFillGiftOptions(){
+  var sel=document.getElementById("sg-gift");
   if(sel && typeof PRODUCTS!=="undefined"){
-    sel.innerHTML = PRODUCTS.map(p=>`<option value="${p.pid||p.docId}" ${((g.giftPid)===(p.pid||p.docId))?"selected":""}>${p.n}</option>`).join("");
+    sel.innerHTML = PRODUCTS.map(function(p){ return '<option value="'+(p.pid||p.docId)+'">'+esc(p.n)+'</option>'; }).join("");
   }
-  setSgType(g.type||"points");
-  const badge = document.getElementById("badge-signup");
-  if(badge) badge.textContent = (g.on===false)? "關閉" :
-    (g.type==="points"? `送 ${g.points} 點` : g.type==="coupon"? "送券" : "送贈品");
+}
+function renderSignupItems(){
+  var el=document.getElementById("sg-list"); if(!el) return;
+  if(!SIGNUP_ITEMS.length){ el.innerHTML='<div class="hint">尚未設定，請在下方新增。</div>'; return; }
+  el.innerHTML=SIGNUP_ITEMS.map(function(it,i){
+    var desc;
+    if(it.type==="amount") desc=esc(it.name||"折價券")+' <span style="color:var(--wine);">(折抵 $'+(it.value||0)+(it.min?'・滿 $'+it.min:'')+')</span>';
+    else if(it.type==="percent") desc=esc(it.name||"折扣券")+' <span style="color:var(--wine);">('+(it.value||0)+' 折'+(it.min?'・滿 $'+it.min:'')+')</span>';
+    else desc='🎁 '+esc(it.giftName||"贈品");
+    return '<div class="rd-row"><div class="rd-body" style="flex:1;"><div>'+desc+'</div></div>'
+      +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delSignupItem('+i+')">刪除</button></div>';
+  }).join('');
+}
+window.delSignupItem=function(i){ SIGNUP_ITEMS.splice(i,1); renderSignupItems(); renderSignupBadge(); };
+window.addSignupItem=function(){
+  if(SIGNUP_ITEMS.length>=3){ alert("最多只能放 3 份喔"); return; }
+  var t=window.SG_ADD_TYPE||"amount";
+  var it={type:t};
+  if(t==="gift"){
+    var gk=(document.getElementById("sg-gift")||{}).value||"";
+    if(!gk){ alert("請選擇贈送品項"); return; }
+    var pp=(typeof PRODUCTS!=="undefined")? PRODUCTS.find(function(x){return (x.pid||x.docId)===gk;}) : null;
+    it.giftPid=gk; it.giftName=pp? pp.n : "贈品";
+  } else {
+    var vv=num("sg-cp-value"); if(!vv){ alert(t==="percent"?"請填折數":"請填折抵金額"); return; }
+    it.name=valTrim("sg-cp-name")||(t==="percent"?"新會員折扣券":"新會員折價券");
+    it.value=vv; it.min=num("sg-cp-min")||0;
+  }
+  SIGNUP_ITEMS.push(it); renderSignupItems(); renderSignupBadge();
+  var nm=$("sg-cp-name"); if(nm) nm.value="";
+};
+function renderSignupBadge(){
+  var g=GLOBAL.signupGift||{};
+  var badge=document.getElementById("badge-signup");
+  if(badge) badge.textContent=(g.on===false)?"關閉":(SIGNUP_ITEMS.length? ("送 "+SIGNUP_ITEMS.length+" 份"):"未設定");
+}
+function renderSignupGift(){
+  var g = GLOBAL.signupGift || {};
+  var sw=document.getElementById("sw-signup"); if(sw) sw.classList.toggle("on", g.on!==false);
+  setV("sg-days", g.days!=null? g.days : 3);
+  SIGNUP_ITEMS = Array.isArray(g.items)? JSON.parse(JSON.stringify(g.items)) : [];
+  if(!SIGNUP_ITEMS.length && g.type){
+    if(g.type==="coupon") SIGNUP_ITEMS=[{type:"amount",name:g.cpName||"新會員折價券",value:g.cpValue||0,min:g.cpMin||0}];
+    else if(g.type==="gift") SIGNUP_ITEMS=[{type:"gift",giftPid:g.giftPid||"",giftName:g.giftName||"贈品"}];
+    /* 舊「送點數」改版後不支援，保留讓店家自行重設 */
+  }
+  sgFillGiftOptions();
+  setSgAddType(window.SG_ADD_TYPE||"amount");
+  renderSignupItems();
+  renderSignupBadge();
+}
+function collectSignupGift(){
+  var sw=document.getElementById("sw-signup");
+  return { on: sw? sw.classList.contains("on"):true, days: num("sg-days")||3, items: SIGNUP_ITEMS.slice() };
 }
 
-function collectSignupGift(){
-  const sw = document.getElementById("sw-signup");
-  const g = GLOBAL.signupGift || {};
-  return {
-    on: sw ? sw.classList.contains("on") : true,
-    type: g.type || "points",
-    points: num("sg-points"),
-    cpName: valTrim("sg-cp-name") || "新會員折價券",
-    cpValue: num("sg-cp-value"),
-    cpMin: num("sg-cp-min"),
-    giftPid: (document.getElementById("sg-gift")||{}).value || "",
-    days: num("sg-days") || 3
-  };
-}
 $("btn-save-set").onclick = async ()=>{
   const s = curSet();
   s.annText = $("ann-input").value.trim();
