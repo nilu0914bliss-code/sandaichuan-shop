@@ -832,8 +832,11 @@ function renderCart(){
     <div class="cart-list">
       ${Object.entries(cart).map(([k,q])=>{
         const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
+        const igs=itemAddonGroups(it); const isel=ITEMSEL[id]||{};
+        const adLines=[]; igs.forEach(function(g){ const nm=selNames(isel[g.id],g); if(nm.length) adLines.push(g.name+"："+nm.join("、")); });
+        const adHTML = adLines.length? `<div style="font-size:12px;color:var(--wine);margin-top:5px;line-height:1.6;">${adLines.map(l=>"🧂 "+aesc(l)).join("<br>")}</div>` : "";
         return `<div class="cart-row">
-          <div class="nm">${it.n}${va.v?`（${va.v}）`:""}<div class="pp">${money(va.p)} × ${q}</div></div>
+          <div class="nm">${it.n}${va.v?`（${va.v}）`:""}<div class="pp">${money(va.p)} × ${q}</div>${adHTML}</div>
           <div class="stepper">
             <button onclick="chg('${id}',${+vi},-1)">−</button>
             <span class="qty">${q}</span>
