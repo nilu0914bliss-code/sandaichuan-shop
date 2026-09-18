@@ -681,6 +681,24 @@
         </div></div>
       </div>
 
+      <div class="scard" id="sc-shopinfo">
+        <div class="scard-h" onclick="toggleCard('sc-shopinfo',event)">
+          <i class="ic">🏪</i><span class="t">店家資訊頁</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="sbadge" id="badge-shopinfo"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;">客人端「店家資訊」分頁的內容。可新增基本資訊、文字、影片、照片區塊，用 ▲▼ 排順序。影片貼 YouTube／臉書／IG 連結即可。</div>
+          <div id="shopinfo-list"></div>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="addShopBlock('info')">＋基本資訊</button>
+            <button class="btn btn-sm" onclick="addShopBlock('text')">＋文字</button>
+            <button class="btn btn-sm" onclick="addShopBlock('video')">＋影片</button>
+            <button class="btn btn-sm" onclick="addShopBlock('photo')">＋照片</button>
+            <button class="btn btn-sm" style="margin-left:auto;background:var(--wine);color:var(--cream);" onclick="saveShopInfo()">儲存店家資訊</button>
+          </div>
+        </div></div>
+      </div>
+
             <button class="btn btn-full" id="btn-save-set" style="margin-top:6px;grid-column:1/-1;">儲存設定</button>
       <div class="hint" style="margin-top:8px;">儲存後客人端重新整理即生效</div>
     </div>
@@ -1320,7 +1338,7 @@ async function loadSettings(){
         s.exists()? s.data() : {});
     }
   }catch(e){ console.error("讀取設定失敗", e); }
-  renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift();
+  renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift(); renderShopInfo();
   /* 設定載入完成後補畫菜單，讓分類順序/隱藏在後台也立即套用（修：後台顯示舊順序） */
   if(typeof renderMenu==="function" && Array.isArray(PRODUCTS) && PRODUCTS.length) renderMenu();
 }
@@ -1402,6 +1420,68 @@ function collectSignupGift(){
   return { on: sw? sw.classList.contains("on"):true, days: num("sg-days")||3, items: SIGNUP_ITEMS.slice() };
 }
 
+let SHOPINFO = [];
+function shopBlockLabel(t){ return t==="info"?"基本資訊":t==="video"?"影片":t==="photo"?"照片":"文字"; }
+function shopBlockCard(b,i){
+  var head='<div class="lv-card"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
+    +'<span class="lv-badge" style="margin:0;">'+shopBlockLabel(b.type)+'</span><span style="flex:1;"></span>'
+    +'<button class="move-b" onclick="moveShopBlock('+i+',-1)" title="上移">▲</button>'
+    +'<button class="move-b" onclick="moveShopBlock('+i+',1)" title="下移">▼</button>'
+    +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:2px 9px;" onclick="delShopBlock('+i+')">刪除</button></div>';
+  var body='';
+  if(b.type==="info"){ b.fields=b.fields||{};
+    body='<div class="cp-fld"><label>市場/店名</label><input value="'+esc(b.fields.market||"")+'" oninput="SHOPINFO['+i+'].fields.market=this.value"></div>'
+      +'<div class="cp-fld"><label>地址</label><input value="'+esc(b.fields.address||"")+'" oninput="SHOPINFO['+i+'].fields.address=this.value"></div>'
+      +'<div class="cp-fld"><label>訂購電話</label><input value="'+esc(b.fields.phone||"")+'" oninput="SHOPINFO['+i+'].fields.phone=this.value"></div>'
+      +'<div class="cp-fld"><label>營業時間</label><textarea rows="2" oninput="SHOPINFO['+i+'].fields.hours=this.value">'+esc(b.fields.hours||"")+'</textarea></div>';
+  } else if(b.type==="video"){
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
+      +'<div class="cp-fld"><label>影片連結（YouTube／臉書／IG）</label><input placeholder="貼上連結" value="'+esc(b.url||"")+'" oninput="SHOPINFO['+i+'].url=this.value"></div>';
+  } else if(b.type==="photo"){
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
+      +'<div style="display:flex;gap:10px;align-items:center;"><div style="width:74px;height:74px;border:1px dashed var(--line);border-radius:6px;overflow:hidden;background:var(--paper);flex-shrink:0;">'+(b.img?'<img src="'+b.img+'" style="width:100%;height:100%;object-fit:cover;">':'')+'</div>'
+      +'<input type="file" accept="image/*" onchange="shopPhotoPick('+i+',this)"></div>';
+  } else {
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
+      +'<div class="cp-fld"><label>內容</label><textarea rows="4" oninput="SHOPINFO['+i+'].text=this.value">'+esc(b.text||"")+'</textarea></div>';
+  }
+  return head+body+'</div>';
+}
+function renderShopInfoList(){
+  var el=document.getElementById("shopinfo-list"); if(!el) return;
+  if(!SHOPINFO.length){ el.innerHTML='<div class="hint">尚未設定，請用下方按鈕新增區塊。</div>'; }
+  else el.innerHTML=SHOPINFO.map(function(b,i){ return shopBlockCard(b,i); }).join("");
+  var bd=document.getElementById("badge-shopinfo"); if(bd) bd.textContent=SHOPINFO.length? (SHOPINFO.length+" 區塊"):"未設定";
+}
+function renderShopInfo(){
+  if(GLOBAL.shopInfo && Array.isArray(GLOBAL.shopInfo.blocks)) SHOPINFO=JSON.parse(JSON.stringify(GLOBAL.shopInfo.blocks));
+  renderShopInfoList();
+}
+window.addShopBlock=function(t){
+  var b={type:t};
+  if(t==="info") b.fields={market:"",address:"",phone:"",hours:"週二～週日 06:00–12:30\n週一公休"};
+  else if(t==="text"){ b.title="品牌故事"; b.text=""; }
+  else if(t==="video"){ b.title="品牌影片"; b.url=""; }
+  else if(t==="photo"){ b.title="店家照片"; b.img=""; }
+  SHOPINFO.push(b); renderShopInfoList();
+};
+window.delShopBlock=function(i){ SHOPINFO.splice(i,1); renderShopInfoList(); };
+window.moveShopBlock=function(i,d){ var j=i+d; if(j<0||j>=SHOPINFO.length) return; var t=SHOPINFO[i]; SHOPINFO[i]=SHOPINFO[j]; SHOPINFO[j]=t; renderShopInfoList(); };
+window.shopPhotoPick=function(i,input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(){ var img=new Image(); img.onload=function(){
+    var mx=1000,w=img.width,h=img.height; if(w>mx||h>mx){ if(w>h){ h=Math.round(h*mx/w); w=mx; } else { w=Math.round(w*mx/h); h=mx; } }
+    var c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h);
+    SHOPINFO[i].img=c.toDataURL("image/jpeg",0.82); renderShopInfoList();
+  }; img.src=rd.result; };
+  rd.readAsDataURL(f);
+};
+window.saveShopInfo=async function(){
+  try{ await setDoc(doc(db,"settings","global"),{shopInfo:{blocks:SHOPINFO}},{merge:true});
+    GLOBAL.shopInfo={blocks:JSON.parse(JSON.stringify(SHOPINFO))}; toast("店家資訊已儲存");
+  }catch(e){ console.error(e); alert("儲存失敗："+(e.message||"")); }
+};
 $("btn-save-set").onclick = async ()=>{
   const s = curSet();
   s.annText = $("ann-input").value.trim();
