@@ -1884,7 +1884,7 @@ function renderTicketImage(d){
   h += 28;
   h += 40;                          /* 三欄標題列 */
   /* 品項：每項 品名(50) + 副標(34) + 間距(20) */
-  d.items.forEach(x=>{ h += 50 + (itemSub(x) ? 34 : 0) + 20; });
+  d.items.forEach(x=>{ h += 50 + (itemSub(x) ? 34 : 0) + ((x.addons&&x.addons.length)? x.addons.length*30 : 0) + 20; });
   h += 14;
   if(d.sauce && d.sauce!=="-" && d.sauce!==""){ h += 48; }  /* 滷汁 */
   if(d.shipFee) h += 46;
@@ -2012,6 +2012,7 @@ function renderTicketImage(d){
     /* 副標（規格） */
     const sub = itemSub(x);
     if(sub){ left(sub, F_ISUB, nameX); y += 34; }
+    if(x.addons && x.addons.length){ x.addons.forEach(function(a){ left("＋" + a, F_ISUB, nameX); y += 30; }); }
     y += 20;
   });
 
@@ -2019,7 +2020,7 @@ function renderTicketImage(d){
 
   /* 滷汁（移到品項下方，冒號對齊底部欄位） */
   if(d.sauce && d.sauce!=="-" && d.sauce!==""){
-    drawLabelValue(ctx, "滷汁", d.sauce, y, F_BODY, PAD); y += 48;
+    drawLabelValue(ctx, "加料", d.sauce, y, F_BODY, PAD); y += 48;
   }
 
   /* 運費／優惠券／點數 */
@@ -2278,7 +2279,7 @@ function renderOrders(){
       <div class="o-body">
         <div class="o-sec">訂購明細</div>
         <div class="o-items">
-          ${(o.items||[]).map(x=>`<div class="r"><span>${x.name} × ${x.qty}</span><span>${money(x.price*x.qty)}</span></div>`).join("")}
+          ${(o.items||[]).map(x=>`<div class="r"><span>${x.name} × ${x.qty}${(x.addons&&x.addons.length)?`<br><span style="font-size:12px;color:var(--wine);">＋${x.addons.map(a=>esc(a)).join("<br>＋")}</span>`:""}</span><span>${money(x.price*x.qty)}</span></div>`).join("")}
           <div class="r"><span>運費</span><span>${isPk?"自取免運":(o.shipFee? money(o.shipFee):"免運")}</span></div>
           ${o.couponDiscount? `<div class="r"><span>優惠券（${o.couponName||""}）</span><span>- ${money(o.couponDiscount)}</span></div>`:""}
           ${o.couponGift? `<div class="r"><span>優惠券贈品</span><span>🎁 ${o.couponGift} ×1</span></div>`:""}
@@ -2286,7 +2287,7 @@ function renderOrders(){
           <div class="r tt"><span>合計${o.payMethod==="cash"?"（現金應收）":""}</span><span>${money(o.total)}</span></div>
           ${o.pointsEarn? `<div class="r" style="font-size:12px;color:var(--ink-soft);"><span>回饋點數</span><span>${o.pointsEarn} 點${o.pointsSettled?"（已入帳）":"（完成後入帳）"}</span></div>`:""}
         </div>
-        <div class="o-sec">滷汁</div><div class="o-line">${o.sauce||"—"}</div>
+        <div class="o-sec">加料（整單）</div><div class="o-line">${o.sauce? esc(o.sauce) : "—"}</div>
         <div class="o-sec">${isPk?"取貨資訊":"收件資訊"}</div>
         <div class="o-line"><b>${o.name||""}</b>　${o.phone||""}<br>${isPk? (o.pickup? o.pickup.market+"市場 · "+(o.pickup.date||"")+" "+(o.pickup.slot||"") : "—") : (o.store? "7-11 "+o.store.city+"・"+o.store.name : "—")}</div>
         ${o.note? `<div class="o-sec">備註</div><div class="o-line">${o.note}</div>`:""}
