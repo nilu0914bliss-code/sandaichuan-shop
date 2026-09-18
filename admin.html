@@ -2823,15 +2823,15 @@ function renderMenu(){
               ${(p.vars||[]).length>1? `<button class="mini-del" onclick="delVar(${idx},${vi})" title="刪除規格">✕</button>`:""}
             </div>`).join("")}
           <div class="pa-wrap">
-            <div class="pa-h">🧂 加料選項（勾要附加哪幾組；群組在「設定 → 加料設定」先建立）</div>
-            ${ADDONS.length
-              ? ADDONS.map(g=>{ const on=(p.addons||[]).indexOf(g.id)>-1;
+            <div class="pa-h">🍗 點品項加料（勾這個品項要不要讓客人點的時候加購；滷味整單加料是全店結帳時自動顯示，不用在這裡勾）</div>
+            ${ADDONS.filter(g=>g.scope==="item").length
+              ? ADDONS.filter(g=>g.scope==="item").map(g=>{ const on=(p.addons||[]).indexOf(g.id)>-1;
                   return `<div class="pa-row ${on?"on":""}" onclick="toggleProdAddon(${idx},'${g.id}',this)">
                     <span class="pa-cbx">${on?"✓":""}</span>
                     <span class="pa-nm">${esc(g.name)}</span>
-                    <span class="pa-md">${g.scope==="order"?"整單":"點品項"}・${g.mode==="one"?"擇一":"複選"}${g.req?"・必選":""}</span>
+                    <span class="pa-md">${g.mode==="one"?"擇一":"複選"}${g.req?"・必選":""}</span>
                   </div>`; }).join("")
-              : `<div class="pa-empty">還沒有加料群組。先到「設定 → 加料設定」新增群組，再回來勾。</div>`}
+              : `<div class="pa-empty">還沒有「點品項加料」分類。先到「設定 → 雞肉品項加料」新增，再回來勾。</div>`}
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;">
             <button class="btn" style="background:none;border:1px solid var(--wine);color:var(--wine);padding:6px 12px;font-size:12.5px;" onclick="addVar(${idx})">＋ 新增規格</button>
