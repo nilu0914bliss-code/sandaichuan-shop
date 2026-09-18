@@ -1430,20 +1430,20 @@ function shopBlockCard(b,i){
     +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:2px 9px;" onclick="delShopBlock('+i+')">刪除</button></div>';
   var body='';
   if(b.type==="info"){ b.fields=b.fields||{};
-    body='<div class="cp-fld"><label>市場/店名</label><input value="'+esc(b.fields.market||"")+'" oninput="SHOPINFO['+i+'].fields.market=this.value"></div>'
-      +'<div class="cp-fld"><label>地址</label><input value="'+esc(b.fields.address||"")+'" oninput="SHOPINFO['+i+'].fields.address=this.value"></div>'
-      +'<div class="cp-fld"><label>訂購電話</label><input value="'+esc(b.fields.phone||"")+'" oninput="SHOPINFO['+i+'].fields.phone=this.value"></div>'
-      +'<div class="cp-fld"><label>營業時間</label><textarea rows="2" oninput="SHOPINFO['+i+'].fields.hours=this.value">'+esc(b.fields.hours||"")+'</textarea></div>';
+    body='<div class="cp-fld"><label>市場/店名</label><input value="'+esc(b.fields.market||"")+'" oninput="setShopFld('+i+',\'market\',this.value)"></div>'
+      +'<div class="cp-fld"><label>地址</label><input value="'+esc(b.fields.address||"")+'" oninput="setShopFld('+i+',\'address\',this.value)"></div>'
+      +'<div class="cp-fld"><label>訂購電話</label><input value="'+esc(b.fields.phone||"")+'" oninput="setShopFld('+i+',\'phone\',this.value)"></div>'
+      +'<div class="cp-fld"><label>營業時間</label><textarea rows="2" oninput="setShopFld('+i+',\'hours\',this.value)">'+esc(b.fields.hours||"")+'</textarea></div>';
   } else if(b.type==="video"){
-    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
-      +'<div class="cp-fld"><label>影片連結（YouTube／臉書／IG）</label><input placeholder="貼上連結" value="'+esc(b.url||"")+'" oninput="SHOPINFO['+i+'].url=this.value"></div>';
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="setShopTop('+i+',\'title\',this.value)"></div>'
+      +'<div class="cp-fld"><label>影片連結（YouTube／臉書／IG）</label><input placeholder="貼上連結" value="'+esc(b.url||"")+'" oninput="setShopTop('+i+',\'url\',this.value)"></div>';
   } else if(b.type==="photo"){
-    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="setShopTop('+i+',\'title\',this.value)"></div>'
       +'<div style="display:flex;gap:10px;align-items:center;"><div style="width:74px;height:74px;border:1px dashed var(--line);border-radius:6px;overflow:hidden;background:var(--paper);flex-shrink:0;">'+(b.img?'<img src="'+b.img+'" style="width:100%;height:100%;object-fit:cover;">':'')+'</div>'
       +'<input type="file" accept="image/*" onchange="shopPhotoPick('+i+',this)"></div>';
   } else {
-    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="SHOPINFO['+i+'].title=this.value"></div>'
-      +'<div class="cp-fld"><label>內容</label><textarea rows="4" oninput="SHOPINFO['+i+'].text=this.value">'+esc(b.text||"")+'</textarea></div>';
+    body='<div class="cp-fld"><label>標題</label><input value="'+esc(b.title||"")+'" oninput="setShopTop('+i+',\'title\',this.value)"></div>'
+      +'<div class="cp-fld"><label>內容</label><textarea rows="4" oninput="setShopTop('+i+',\'text\',this.value)">'+esc(b.text||"")+'</textarea></div>';
   }
   return head+body+'</div>';
 }
@@ -1465,6 +1465,8 @@ window.addShopBlock=function(t){
   else if(t==="photo"){ b.title="店家照片"; b.img=""; }
   SHOPINFO.push(b); renderShopInfoList();
 };
+window.setShopFld=function(i,k,v){ if(SHOPINFO[i]){ SHOPINFO[i].fields=SHOPINFO[i].fields||{}; SHOPINFO[i].fields[k]=v; } };
+window.setShopTop=function(i,k,v){ if(SHOPINFO[i]) SHOPINFO[i][k]=v; };
 window.delShopBlock=function(i){ SHOPINFO.splice(i,1); renderShopInfoList(); };
 window.moveShopBlock=function(i,d){ var j=i+d; if(j<0||j>=SHOPINFO.length) return; var t=SHOPINFO[i]; SHOPINFO[i]=SHOPINFO[j]; SHOPINFO[j]=t; renderShopInfoList(); };
 window.shopPhotoPick=function(i,input){
