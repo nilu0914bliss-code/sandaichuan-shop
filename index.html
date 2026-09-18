@@ -141,6 +141,18 @@
     padding:11px 12px;font-size:14.5px;cursor:pointer;font-weight:400;}
   .sauce input{accent-color:var(--wine);width:17px;height:17px;}
   .sauce label:has(input:checked){border-color:var(--wine);background:var(--cream-soft);font-weight:700;}
+  .sauce label.on{border-color:var(--wine);background:var(--cream-soft);font-weight:700;}
+  .sauce .ck{width:20px;height:20px;border:2px solid #c7b58e;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;flex-shrink:0;}
+  .sauce .ck.r{border-radius:50%;}
+  .sauce label.on .ck{background:var(--wine);border-color:var(--wine);}
+  .iaddon{margin:2px 0 4px;padding:10px 11px;background:var(--cream-soft);border:1px solid var(--line);border-radius:8px;}
+  .ia-t{font-size:12px;font-weight:800;color:var(--wine);letter-spacing:1px;margin:2px 0 6px;}
+  .ia-opt{display:flex;align-items:center;gap:8px;padding:7px 2px;font-size:13.5px;cursor:pointer;border-bottom:1px dashed var(--line);}
+  .ia-opt:last-child{border-bottom:none;}
+  .ia-box{width:19px;height:19px;border:2px solid #c7b58e;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;flex-shrink:0;}
+  .ia-box.r{border-radius:50%;}
+  .ia-opt.on .ia-box{background:var(--wine);border-color:var(--wine);}
+  .ia-lab{flex:1;} .ia-pr{font-size:12px;color:var(--ink-soft);}
   .pay-box{background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:14px;}
   .pay-box .logo{background:var(--wine);color:var(--cream);font-size:11px;font-weight:700;padding:3px 8px;border-radius:2px;letter-spacing:1px;}
 
@@ -596,6 +608,7 @@ function rebuildProducts(){
       const cd = (p.ch && p.ch[k]) || {};
       return {
         id: p.pid, docId: p._docId, n: p.n, img: p.photo||"", desc: p.desc||"", tag: p.tag||"", tagColor: p.tagColor||"rose",
+        addons: Array.isArray(p.addons)? p.addons.slice() : [],
         sold: cd.on === false || (typeof window._STK!=="undefined" && window._STK && p._docId && window._STK[p._docId]!=null && window._STK[p._docId]<=0),
         stockLeft: (typeof window._STK!=="undefined" && window._STK && p._docId && window._STK[p._docId]!=null)? window._STK[p._docId] : null,
         limit: (cd.limit===undefined||cd.limit===null)? null : cd.limit,
@@ -617,7 +630,7 @@ function rebuildProducts(){
 function applyProducts(list){
   PRODUCTS.length = 0;
   list.forEach(x=>PRODUCTS.push(x));
-  cart = {}; activeCat = 0;
+  cart = {}; ORDERSEL = {}; ITEMSEL = {}; activeCat = 0;
   renderCats(); renderMenu(); renderBar(); renderCart();
 setTimeout(()=>{ if(typeof syncLoginTip==="function") syncLoginTip(); }, 100);
 /* 尚未選擇取貨點就先進選擇頁 */
@@ -633,6 +646,55 @@ const $ = id => document.getElementById(id);
 const money = n => "NT$ " + n.toLocaleString();
 function findItem(id){ for(const s of PRODUCTS){ const it=s.items.find(x=>x.id===id); if(it) return it; } }
 function keyOf(id,vi){ return id+"|"+vi; }
+
+/* ===== 加料（配料/滷汁/醬料）客人端 ===== */
+let ORDERSEL = {};   // 結帳整單一次：gid -> (擇一:number) | (複選:{oi:true})
+let ITEMSEL  = {};   // 點品項各自：productId -> { gid -> (擇一:number) | (複選:{oi:true}) }
+function AGROUPS(){ return (SETTINGS && Array.isArray(SETTINGS.addonGroups))? SETTINGS.addonGroups : []; }
+function groupById(gid){ return AGROUPS().find(function(g){ return g.id===gid; }); }
+function aesc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
+function itemAddonGroups(it){ return (it && Array.isArray(it.addons))? AGROUPS().filter(function(g){ return g.scope==="item" && it.addons.indexOf(g.id)>-1; }) : []; }
+function orderAddonGroups(){
+  var ids={};
+  for(var k in cart){ if(cart[k]>0){ var it=findItem(k.split("|")[0]); if(it && it.addons) it.addons.forEach(function(x){ ids[x]=1; }); } }
+  return AGROUPS().filter(function(g){ return g.scope==="order" && ids[g.id]; });
+}
+function optOn(sel,g,oi){ if(sel==null) return false; return g.mode==="one"? (sel===oi) : !!(sel && sel[oi]); }
+function selSum(sel,g){ var s=0; if(sel==null) return 0; if(g.mode==="one"){ if(typeof sel==="number" && g.opts[sel]) s+=(g.opts[sel].p||0); } else { for(var oi in sel){ if(sel[oi] && g.opts[oi]) s+=(g.opts[oi].p||0); } } return s; }
+function selNames(sel,g){ var out=[]; if(sel==null) return out; if(g.mode==="one"){ if(typeof sel==="number" && g.opts[sel]) out.push(g.opts[sel].n); } else { for(var oi in sel){ if(sel[oi] && g.opts[oi]) out.push(g.opts[oi].n); } } return out; }
+function itemQty(it){ var q=0; (it.vars||[]).forEach(function(va,vi){ q+=(cart[keyOf(it.id,vi)]||0); }); return q; }
+function toggleOrderSel(gid,oi){ var g=groupById(gid); if(!g) return;
+  if(g.mode==="one"){ ORDERSEL[gid]=(ORDERSEL[gid]===oi?null:oi); }
+  else { ORDERSEL[gid]=ORDERSEL[gid]||{}; ORDERSEL[gid][oi]=!ORDERSEL[gid][oi]; }
+  var w=$("addon-warn"); if(w) w.style.display="none";
+  renderCart();
+}
+function toggleItemSel(id,gid,oi){ var g=groupById(gid); if(!g) return;
+  ITEMSEL[id]=ITEMSEL[id]||{};
+  if(g.mode==="one"){ ITEMSEL[id][gid]=(ITEMSEL[id][gid]===oi?null:oi); }
+  else { ITEMSEL[id][gid]=ITEMSEL[id][gid]||{}; ITEMSEL[id][gid][oi]=!ITEMSEL[id][gid][oi]; }
+  renderMenu(); renderBar(); renderCart();
+}
+function itemAddonHTML(it){
+  var igs=itemAddonGroups(it); if(!igs.length) return "";
+  if(itemQty(it)<=0) return "";
+  var sel=ITEMSEL[it.id]||{};
+  return '<div class="iaddon">'+igs.map(function(g){
+    return '<div class="ia-t">'+aesc(g.name)+(g.mode==="one"?"（擇一）":"（可複選）")+(g.req?' <b style="color:#C8351F;">必選</b>':'')+'</div>'
+      +g.opts.map(function(o,oi){ var on=optOn(sel[g.id],g,oi);
+        return '<label class="ia-opt'+(on?" on":"")+'" onclick="toggleItemSel(\''+it.id+'\',\''+g.id+'\','+oi+')"><span class="ia-box'+(g.mode==="one"?" r":"")+'">'+(on?"✓":"")+'</span><span class="ia-lab">'+aesc(o.n)+'</span>'+(o.p>0?'<span class="ia-pr">＋$'+o.p+'</span>':'')+'</label>';
+      }).join("");
+  }).join("")+'</div>';
+}
+function orderAddonHTML(){
+  var ogs=orderAddonGroups(); if(!ogs.length) return "";
+  return ogs.map(function(g){ var sel=ORDERSEL[g.id];
+    return '<div class="f-sec" style="margin:16px 16px 8px;">'+aesc(g.name)+(g.mode==="one"?"【擇一】":"【可複選】")+(g.req?"（必選）":"")+'</div>'
+      +'<div class="sauce" style="margin:0 16px;">'+g.opts.map(function(o,oi){ var on=optOn(sel,g,oi);
+        return '<label class="'+(on?"on":"")+'" onclick="toggleOrderSel(\''+g.id+'\','+oi+')"><span class="ck'+(g.mode==="one"?" r":"")+'">'+(on?"✓":"")+'</span><span style="flex:1;">'+aesc(o.n)+'</span>'+(o.p>0?'<span style="font-size:12px;color:var(--ink-soft);">＋$'+o.p+'</span>':'')+'</label>';
+      }).join("")+'</div>';
+  }).join("");
+}
 
 function renderCats(){
   $("cats").innerHTML = PRODUCTS.map((s,i)=>
@@ -664,6 +726,7 @@ function renderMenu(){
               <button class="add" onclick="chg('${it.id}',${vi},1)" ${it.sold?"disabled":""}>＋</button>
             </div>
           </div>`;}).join("")}
+        ${itemAddonHTML(it)}
         </div>
       </div>`).join("")}`).join("")
   ;
@@ -742,9 +805,15 @@ function chg(id,vi,d){
 function totals(){
   let count=0, sub=0;
   for(const [k,q] of Object.entries(cart)){
-    const [id,vi]=k.split("|"); const it=findItem(id);
-    count+=q; sub+=it.vars[+vi].p*q;
+    const [id,vi]=k.split("|"); const it=findItem(id); if(!it) continue;
+    count+=q; sub+=(it.vars[+vi].p||0)*q;
+    /* 品項加料（每份各自）：每份加價 × 數量 */
+    const igs=itemAddonGroups(it); const isel=ITEMSEL[id]||{};
+    let per=0; igs.forEach(function(g){ per+=selSum(isel[g.id],g); });
+    sub += per*q;
   }
+  /* 整單加料（結帳一次）：整筆加一次 */
+  orderAddonGroups().forEach(function(g){ sub += selSum(ORDERSEL[g.id],g); });
   const _sr=shipRule(); const ship = sub===0?0:((_sr.freeAt>0 && sub>=_sr.freeAt)?0:_sr.fee);
   return {count, sub, ship, total: sub+ship};
 }
@@ -774,11 +843,8 @@ function renderCart(){
           </div>
         </div>`;}).join("")}
     </div>
-    <div class="f-sec" style="margin:16px 16px 8px;">靈 魂 滷 汁【三擇一】</div>
-    <div class="sauce" style="margin:0 16px;">
-      ${(SETTINGS.sauces||["招牌蒜蓉醬","原味老滷","微甜辣老滷"]).map(s=>`<label><input type="radio" name="cart-sauce" value="${s}" ${sauceSel===s?"checked":""} onchange="setSauce(this.value)"> ${s}</label>`).join("")}
-    </div>
-    <div class="hint" id="sauce-warn" style="display:none;color:#C8351F;font-weight:700;margin:8px 16px 0;">請先選擇滷汁再結帳</div>
+    ${orderAddonHTML()}
+    <div class="hint" id="addon-warn" style="display:none;color:#C8351F;font-weight:700;margin:8px 16px 0;">請先選好必填的加料再結帳</div>
     <div class="summary">
       <div class="row total"><span>小計</span><span>${money(t.sub)}</span></div>
       <div class="row" style="font-size:12px;color:var(--ink-soft);"><span>運費依取貨方式於結帳頁計算</span><span></span></div>
@@ -1009,7 +1075,11 @@ function renderPayOpts(){
 function syncPayBtn(){ $("pay-btn").textContent = payway==="cash"? "送出訂單":"前往付款"; }
 function openCheckout(){
   if(!requireLogin()) return;
-  if(!sauceSel){ const w = $("sauce-warn"); if(w) w.style.display = "block"; return; }
+  /* 必填加料檢查（整單＋品項） */
+  const missReq=[];
+  orderAddonGroups().forEach(function(g){ if(g.req && selNames(ORDERSEL[g.id],g).length===0) missReq.push(g.name); });
+  for(const k in cart){ if(cart[k]>0){ const it=findItem(k.split("|")[0]); if(it){ itemAddonGroups(it).forEach(function(g){ if(g.req){ const s=(ITEMSEL[it.id]||{})[g.id]; const lab=it.n+"的"+g.name; if(selNames(s,g).length===0 && missReq.indexOf(lab)<0) missReq.push(lab); } }); } } }
+  if(missReq.length){ const w=$("addon-warn"); if(w){ w.textContent="請先選：「"+missReq.join("」「")+"」再結帳"; w.style.display="block"; try{ w.scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){} } return; }
   const c = curCh();
   if(!c || !chOpen(c.k)){ alert("請先選擇取貨點。"); renderChList(); go("p-pickch"); return; }
   shipMethod = c.type;
@@ -1078,14 +1148,23 @@ async function pay(){
   const _pr2 = SETTINGS.pointRule || {}; const ptEarn = (_pr2.on ? Math.floor(grand / (_pr2.spendPer||100)) * (_pr2.ptsGet||1) : 0);
   const items = Object.entries(cart).map(([k,q])=>{
     const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
-    return {name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:va.p};
+    const igs=itemAddonGroups(it); const isel=ITEMSEL[id]||{};
+    const adLines=[]; let adPrice=0;
+    igs.forEach(function(g){ const nm=selNames(isel[g.id],g); if(nm.length){ adLines.push(g.name+"："+nm.join("、")); adPrice+=selSum(isel[g.id],g); } });
+    const o={name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:(va.p||0)+adPrice};
+    if(adLines.length) o.addons=adLines;
+    return o;
   });
+  /* 整單加料（滷味結帳時整筆選一次） */
+  const orderAddonsArr=[];
+  orderAddonGroups().forEach(function(g){ const nm=selNames(ORDERSEL[g.id],g); if(nm.length) orderAddonsArr.push(g.name+"："+nm.join("、")); });
+  const orderAddonsText = orderAddonsArr.join("　");
   const order = {
     uid: (member && member.uid) || null,
     orderNo: no, type:shipMethod, payMethod:payway,
     status: isCash ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
-    sauce:sauceSel, note:$("f-note").value.trim(),
+    sauce: orderAddonsText, orderAddons: orderAddonsArr, note:$("f-note").value.trim(),
     items: giftOn? [...items, {name:"🎁 "+(cpDoc.giftName||"贈品")+"（優惠券贈品）", qty:1, price:0}] : items,
     subtotal:tt.sub, shipFee,
     pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
@@ -1185,7 +1264,7 @@ async function pay(){
   ptUse = 0; cpSel = null;
   // 先清購物車、切到完成頁（確保畫面一定跳過去）
   const pdate = $("f-pdate").value, ptime = $("f-ptime").value, pmarket = $("f-pmarket").value;
-  cart = {};
+  cart = {}; ORDERSEL = {}; ITEMSEL = {};
   try{
     $("order-no").textContent = no || "—";
     const isCash = (payway === "cash");
