@@ -857,34 +857,71 @@ async function loadMemberOrders(uid){
     }).join("");
   }catch(e){ el.innerHTML='<div class="hint" style="color:#C8351F;">訂單讀取失敗：'+e.message+'</div>'; }
 }
-window.mbGrantPoints = async function(){
+window.mbGrantPoints = function(){
   if(!MB_CUR) return;
-  const n=prompt("補送幾點給「"+(MB_CUR.name||"此會員")+"」？","");
-  const pts=parseInt(n,10);
-  if(!pts||pts<=0) return;
+  window._ptVal = 0;
+  var keys="";
+  [1,2,3,4,5,6,7,8,9].forEach(function(n){ keys += `<button onclick="mbPtKey(${n})" style="padding:16px 0;font-size:20px;font-weight:700;border:1px solid var(--line);background:#fff;border-radius:10px;font-family:inherit;">${n}</button>`; });
+  keys += `<button onclick="mbPtClear()" style="padding:16px 0;font-size:15px;color:var(--ink-soft);border:1px solid var(--line);background:#fff;border-radius:10px;font-family:inherit;">清除</button>`;
+  keys += `<button onclick="mbPtKey(0)" style="padding:16px 0;font-size:20px;font-weight:700;border:1px solid var(--line);background:#fff;border-radius:10px;font-family:inherit;">0</button>`;
+  keys += `<button onclick="mbPtBack()" style="padding:16px 0;font-size:15px;color:var(--ink-soft);border:1px solid var(--line);background:#fff;border-radius:10px;font-family:inherit;">\u232b</button>`;
+  var box=document.createElement("div");
+  box.id="mb-modal";
+  box.style.cssText="position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;";
+  var nm = esc(MB_CUR.name||MB_CUR.lineName||"此會員");
+  box.innerHTML=`<div style="background:#fff;width:100%;max-width:460px;border-radius:16px 16px 0 0;"><div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);"><span style="flex:1;font-size:15px;font-weight:800;color:var(--wine);">\ud83e\ude99 補送點數</span><span onclick="mbCloseModal()" style="font-size:22px;color:var(--ink-soft);cursor:pointer;">\u00d7</span></div><div style="padding:14px 16px;"><div style="font-size:12px;color:var(--ink-soft);">補送給「${nm}」</div><div id="pt-disp" style="text-align:center;font-size:38px;font-weight:800;color:var(--wine);padding:14px 0 8px;">0 <span style="font-size:16px;color:var(--ink-soft);">點</span></div><div style="display:flex;gap:8px;margin-bottom:12px;"><button onclick="mbPtQuick(10)" style="flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:8px;padding:9px 0;font-weight:700;font-family:inherit;">+10</button><button onclick="mbPtQuick(50)" style="flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:8px;padding:9px 0;font-weight:700;font-family:inherit;">+50</button><button onclick="mbPtQuick(100)" style="flex:1;border:1px solid var(--wine);background:#fff;color:var(--wine);border-radius:8px;padding:9px 0;font-weight:700;font-family:inherit;">+100</button></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${keys}</div><button onclick="mbPtSend()" style="width:100%;margin-top:14px;padding:14px;background:var(--wine);color:var(--cream);border:none;border-radius:10px;font-size:16px;font-weight:800;font-family:inherit;letter-spacing:2px;">送出</button></div></div>`;
+  document.body.appendChild(box);
+};
+window.mbCloseModal = function(){ var m=document.getElementById("mb-modal"); if(m) m.remove(); };
+function mbPtRefresh(){ var d=document.getElementById("pt-disp"); if(d) d.innerHTML=(window._ptVal||0)+` <span style="font-size:16px;color:var(--ink-soft);">點</span>`; }
+window.mbPtKey = function(n){ window._ptVal=(window._ptVal||0)*10+n; if(window._ptVal>99999) window._ptVal=99999; mbPtRefresh(); };
+window.mbPtQuick = function(n){ window._ptVal=(window._ptVal||0)+n; mbPtRefresh(); };
+window.mbPtClear = function(){ window._ptVal=0; mbPtRefresh(); };
+window.mbPtBack = function(){ window._ptVal=Math.floor((window._ptVal||0)/10); mbPtRefresh(); };
+window.mbPtSend = async function(){
+  var pts=window._ptVal||0;
+  if(pts<=0){ alert("請輸入點數"); return; }
   if(!confirm("確定補送 "+pts+" 點給「"+(MB_CUR.name||"此會員")+"」？")) return;
   try{
-    const newAvail=(MB_CUR.available!=null?MB_CUR.available:(MB_CUR.points||0))+pts;
-    const newPoints=(MB_CUR.points||0)+pts;
+    var newAvail=(MB_CUR.available!=null?MB_CUR.available:(MB_CUR.points||0))+pts;
+    var newPoints=(MB_CUR.points||0)+pts;
     await updateDoc(doc(db,"members",MB_CUR.uid),{available:newAvail,points:newPoints});
     MB_CUR.available=newAvail; MB_CUR.points=newPoints;
-    const idx=MEMBERS_CACHE.findIndex(function(x){return x.uid===MB_CUR.uid;});
+    var idx=MEMBERS_CACHE.findIndex(function(x){return x.uid===MB_CUR.uid;});
     if(idx>=0){ MEMBERS_CACHE[idx].available=newAvail; MEMBERS_CACHE[idx].points=newPoints; }
-    toast("已補送 "+pts+" 點"); renderMemberInfo(MB_CUR); loadMemberOrders(MB_CUR.uid);
+    mbCloseModal(); toast("已補送 "+pts+" 點"); renderMemberInfo(MB_CUR); loadMemberOrders(MB_CUR.uid);
   }catch(e){ alert("補送失敗："+e.message); }
 };
-window.mbGrantCoupon = async function(){
+window.mbGrantCoupon = function(){
   if(!MB_CUR) return;
-  const name=prompt("優惠券名稱（例：折價券 $50）","折價券 $50");
-  if(!name) return;
-  const v=parseInt(prompt("折抵金額（元）","50"),10);
-  if(!v||v<=0){ alert("折抵金額不正確"); return; }
-  const days=parseInt(prompt("幾天內到期？","30"),10)||30;
-  if(!confirm("確定補送「"+name+" 折抵$"+v+"」給「"+(MB_CUR.name||"此會員")+"」？")) return;
+  var catalog=(GLOBAL.redeemCatalog||[]);
+  var box=document.createElement("div");
+  box.id="mb-modal";
+  box.style.cssText="position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;";
+  var list="";
+  if(!catalog.length){ list=`<div class="hint" style="padding:20px;text-align:center;">點數兌換目錄尚未設定任何券，請先到「設定→點數兌換目錄」新增。</div>`; }
+  else{
+    catalog.forEach(function(r,i){
+      var label = r.type==="percent" ? (r.value+" 折") : r.type==="gift" ? ("\ud83c\udf81 "+esc(r.giftName||"贈品")) : ("折 $"+r.value);
+      var sub = (r.minSpend?("滿 $"+r.minSpend+" 可用\u30fb"):"")+((r.days||30)+" 天到期");
+      list += `<div onclick="mbSendCoupon(${i})" style="display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:9px;cursor:pointer;"><div style="min-width:52px;text-align:center;background:var(--cream-soft);border-radius:6px;padding:6px;font-size:12px;font-weight:800;color:var(--wine);">${label}</div><div style="flex:1;"><div style="font-size:14px;font-weight:700;">${esc(r.name)}</div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">${sub}</div></div><span style="color:var(--wine);font-weight:700;">補送 \u203a</span></div>`;
+    });
+  }
+  var nm=esc(MB_CUR.name||"此會員");
+  box.innerHTML=`<div style="background:#fff;width:100%;max-width:460px;max-height:80vh;overflow:auto;border-radius:16px 16px 0 0;"><div style="position:sticky;top:0;background:#fff;display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);"><span style="flex:1;font-size:15px;font-weight:800;color:var(--wine);">\ud83c\udf9f 補送優惠券</span><span onclick="mbCloseModal()" style="font-size:22px;color:var(--ink-soft);cursor:pointer;">\u00d7</span></div><div style="padding:14px 16px;"><div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">補送給「${nm}」— 點選要送的券：</div>${list}</div></div>`;
+  document.body.appendChild(box);
+};
+window.mbSendCoupon = async function(i){
+  var r=(GLOBAL.redeemCatalog||[])[i]; if(!r||!MB_CUR) return;
+  if(!confirm("確定補送「"+r.name+"」給「"+(MB_CUR.name||"此會員")+"」？")) return;
   try{
-    const exp=new Date(Date.now()+days*86400000).toISOString().slice(0,10);
-    await addDoc(collection(db,"members",MB_CUR.uid,"coupons"),{name:name,type:"amount",value:v,minSpend:0,channels:CH.map(function(c){return c.k;}),expire:exp,used:false,createdAt:serverTimestamp(),fromAdmin:true});
-    toast("已補送優惠券");
+    var days=r.days||30;
+    var exp=new Date(Date.now()+days*86400000).toISOString().slice(0,10);
+    var cid="admin_"+Date.now();
+    var cp={ uid:MB_CUR.uid, name:r.name, type:(r.type||"amount"), value:r.type==="gift"?0:(r.value||0), minSpend:r.minSpend||0, channels:CH.map(function(c){return c.k;}), expire:exp, used:false, createdAt:serverTimestamp(), fromAdmin:true };
+    if(r.type==="gift"){ cp.giftName=r.giftName||"贈品"; if(r.giftKey) cp.giftPid=String(r.giftKey).split("|")[0]; }
+    await setDoc(doc(db,"usercoupons", MB_CUR.uid+"_"+cid), cp);
+    mbCloseModal(); toast("已補送優惠券，客人重整即可看到");
   }catch(e){ alert("補送失敗："+e.message); }
 };
 
