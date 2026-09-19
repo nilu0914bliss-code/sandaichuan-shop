@@ -630,7 +630,10 @@ function rebuildProducts(){
 function applyProducts(list){
   PRODUCTS.length = 0;
   list.forEach(x=>PRODUCTS.push(x));
-  cart = {}; ORDERSEL = {}; ITEMSEL = {}; activeCat = 0;
+  var _nowCh = (typeof MY_CH!=="undefined"? (MY_CH||"") : "");
+  if(!_cartBooted){ restoreCart(); _cartCh = _nowCh; }           /* 第一次載入商品：還原上次的購物車 */
+  else if(_nowCh !== _cartCh){ cart = {}; ORDERSEL = {}; ITEMSEL = {}; clearCartStore(); _cartCh = _nowCh; }  /* 只有「真的換了取貨點」才清空（同取貨點重新整理商品時保留購物車）*/
+  activeCat = 0;
   renderCats(); renderMenu(); renderBar(); renderCart();
 setTimeout(()=>{ if(typeof syncLoginTip==="function") syncLoginTip(); }, 100);
 /* 尚未選擇取貨點就先進選擇頁 */
@@ -646,6 +649,31 @@ const $ = id => document.getElementById(id);
 const money = n => "NT$ " + n.toLocaleString();
 function findItem(id){ for(const s of PRODUCTS){ const it=s.items.find(x=>x.id===id); if(it) return it; } }
 function keyOf(id,vi){ return id+"|"+vi; }
+
+/* ===== 購物車暫存（LINE 內建瀏覽器不小心跳出去也不會清空）===== */
+var _cartBooted = false;   /* 開機還原完成前，不覆寫已存的購物車 */
+var _cartCh = null;        /* 目前購物車所屬的取貨點；換取貨點才清空 */
+function saveCart(){
+  if(!_cartBooted) return;
+  try{ localStorage.setItem("sdc_cart", JSON.stringify({ c: cart, i: ITEMSEL, o: ORDERSEL, ch: (typeof MY_CH!=="undefined"? MY_CH : "") })); }catch(e){}
+}
+function restoreCart(){
+  _cartBooted = true;
+  try{
+    var raw = localStorage.getItem("sdc_cart");
+    if(!raw){ cart={}; ORDERSEL={}; ITEMSEL={}; return; }
+    var d = JSON.parse(raw) || {};
+    /* 不同取貨點價格不同，還原時只接受同一個取貨點存的車 */
+    if((d.ch||"") !== (typeof MY_CH!=="undefined"? (MY_CH||"") : "")){ cart={}; ORDERSEL={}; ITEMSEL={}; return; }
+    var c = (d.c && typeof d.c==="object")? d.c : {};
+    var clean = {};
+    for(var k in c){ var q=c[k]; if(!(q>0)) continue; var it=findItem(k.split("|")[0]); if(it) clean[k]=q; }  /* 丟掉已下架/不存在的品項 */
+    cart = clean;
+    ITEMSEL  = (d.i && typeof d.i==="object")? d.i : {};
+    ORDERSEL = (d.o && typeof d.o==="object")? d.o : {};
+  }catch(e){ cart={}; ORDERSEL={}; ITEMSEL={}; }
+}
+function clearCartStore(){ try{ localStorage.removeItem("sdc_cart"); }catch(e){} }
 
 /* ===== 加料（配料/滷汁/醬料）客人端 ===== */
 let ORDERSEL = {};   // 結帳整單一次：gid -> (擇一:number) | (複選:{oi:true})
@@ -825,13 +853,14 @@ function renderBar(){
   b.textContent = t.count;
 }
 function renderCart(){
+  saveCart();
   const t=totals();
   if(!t.count){ $("cart-body").innerHTML=`<div class="empty">購物車是空的，<br>回商品頁挑幾樣好料吧。</div>`; return; }
   const gap = shipRule().freeAt - t.sub;
   $("cart-body").innerHTML = `
     <div class="cart-list">
       ${Object.entries(cart).map(([k,q])=>{
-        const [id,vi]=k.split("|"); const it=findItem(id); const va=it.vars[+vi];
+        const [id,vi]=k.split("|"); const it=findItem(id); if(!it) return ""; const va=it.vars[+vi];
         const igs=itemAddonGroups(it); const isel=ITEMSEL[id]||{};
         const adLines=[]; igs.forEach(function(g){ const nm=selNames(isel[g.id],g); if(nm.length) adLines.push(g.name+"："+nm.join("、")); });
         const adHTML = adLines.length? `<div style="font-size:12px;color:var(--wine);margin-top:5px;line-height:1.6;">${adLines.map(l=>"🧂 "+aesc(l)).join("<br>")}</div>` : "";
@@ -991,6 +1020,11 @@ function cpValue(){
   return c? cpDiscount(c, totals().sub) : 0;
 }
 window.selCoupon = id=>{
+  const _c = MY_CP.find(x=>x.docId===id);
+  if(_c && cpIsGift(_c) && cpSel!==id && cartUnitPriceOf(_c.giftPid)==null){
+    alert("請先把「"+(_c.giftName||"這個品項")+"」加入購物車，再使用這張券。");
+    return;
+  }
   cpSel = (cpSel===id)? null : id;
   if(cpSel) setPt(0);
   renderCpBox(); renderPtBox(); updateCkSummary();
@@ -1004,7 +1038,7 @@ function renderCpBox(){
   $("cp-options").innerHTML = list.map(c=>`
     <div class="cp-pick ${cpSel===c.docId?"on":""}" onclick="selCoupon('${c.docId}')" style="margin-bottom:8px;">
       <div class="l">
-        <div class="t">${c.name}　${cpIsGift(c)? "🎁 送 "+(c.giftName||"品項") : "−"+money(cpDiscount(c, sub))}</div>
+        <div class="t">${c.name}　${cpIsGift(c)? (cartUnitPriceOf(c.giftPid)!=null? ("🎁 "+(c.giftName||"品項")+"　"+((c.giftDiscount>0)? ("折 "+money(Math.min(c.giftDiscount, cartUnitPriceOf(c.giftPid)))) : "免費")) : ("🎁 "+(c.giftName||"品項")+"（需先加入購物車）")) : "−"+money(cpDiscount(c, sub))}</div>
         <div class="d">${c.minSpend? "滿 "+money(c.minSpend)+" 可用・":""}${c.expire.replace(/-/g,"/")} 到期</div>
       </div>
       <span class="go">${cpSel===c.docId? "已選用 ✓":"選用 ›"}</span>
@@ -1040,8 +1074,7 @@ function updateCkSummary(){
   $("ck-summary").innerHTML = `
     <div class="row"><span>小計</span><span>${money(t.sub)}</span></div>
     <div class="row"><span>運費</span><span>${shipMethod==="pickup"?"自取免運":(ship===0?"免運":money(ship))}</span></div>
-    ${cpv? `<div class="row" style="color:var(--gold);"><span>優惠券</span><span>- ${money(cpv)}</span></div>`:""}
-    ${(()=>{ const c=curCoupon(); return cpGiftOk(c, t.sub)? `<div class="row" style="color:var(--gold);"><span>優惠券贈品</span><span>🎁 ${c.giftName||"品項"} ×1</span></div>`:""; })()}
+    ${cpv? `<div class="row" style="color:var(--gold);"><span>優惠券${(()=>{ const c=curCoupon(); return cpIsGift(c)? "（"+(c.giftName||"品項")+"）":""; })()}</span><span>- ${money(cpv)}</span></div>`:""}
     ${use? `<div class="row" style="color:var(--gold);"><span>點數折抵</span><span>- ${money(use)}</span></div>`:""}
     <div class="row total"><span>應付</span><span>${money(gross-use-cpv)}</span></div>
     ${member? `<div class="row" style="font-size:12px;color:var(--ink-soft);"><span>本單可得點數</span><span>${earn} 點</span></div>`:""}`;
@@ -1141,8 +1174,7 @@ async function pay(){
   const shipFee = shipMethod==="pickup"? 0 : tt.ship;
   const gross = tt.sub + shipFee;
   const cpApplied = member? Math.min(cpValue(), gross) : 0;
-  const cpDoc = curCoupon();
-  const giftOn = cpGiftOk(cpDoc, tt.sub);
+  const cpDoc = (member && cpApplied > 0)? curCoupon() : null;   /* 折抵為 0（例如品項券的品項不在車上）就不佔用這張券 */
   const ptApplied = (member && !cpApplied)? Math.min(ptUse, gross) : 0;
   const grand = gross - ptApplied - cpApplied;
   const myLv = member? levelOf(member.spent) : getLevels()[0];
@@ -1166,14 +1198,14 @@ async function pay(){
     status: isCash ? "confirmed_cash" : "pending_payment",
     name:$("f-name").value.trim(), phone:$("f-phone").value.trim(), email:$("f-email").value.trim(),
     sauce: orderAddonsText, orderAddons: orderAddonsArr, note:$("f-note").value.trim(),
-    items: giftOn? [...items, {name:"🎁 "+(cpDoc.giftName||"贈品")+"（優惠券贈品）", qty:1, price:0}] : items,
+    items: items,
     subtotal:tt.sub, shipFee,
     pointsUsed: ptApplied, pointsEarn: ptEarn, pointsSettled: false,
     couponUid: cpDoc? cpDoc.docId : null,
     couponCid: cpDoc? (cpDoc.cid || null) : null,
     couponName: cpDoc? cpDoc.name : "",
     couponDiscount: cpApplied,
-    couponGift: giftOn? (cpDoc.giftName||"贈品") : "",
+    couponGift: "",   /* 新做法：品項券直接折在購物車那份上（見 couponDiscount），不再另外掛一份贈品，避免師傅重複打包 */
     total: grand
   };
   if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
@@ -1256,7 +1288,7 @@ async function pay(){
     const el = $("done-points");
     if(el){
       el.style.display = "block";
-      el.innerHTML = (giftOn? `優惠券贈品：<b>${cpDoc.giftName||"品項"}</b> ×1<br>`:"") +
+      el.innerHTML =
         (cpApplied? `已使用優惠券折抵 <b>${money(cpApplied)}</b><br>`:"") +
         (ptApplied? `本單折抵 <b>${ptApplied}</b> 點<br>`:"") +
         `完成取貨後可獲得 <b>${ptEarn}</b> 點`;
@@ -1265,7 +1297,7 @@ async function pay(){
   ptUse = 0; cpSel = null;
   // 先清購物車、切到完成頁（確保畫面一定跳過去）
   const pdate = $("f-pdate").value, ptime = $("f-ptime").value, pmarket = $("f-pmarket").value;
-  cart = {}; ORDERSEL = {}; ITEMSEL = {};
+  cart = {}; ORDERSEL = {}; ITEMSEL = {}; clearCartStore();
   try{
     $("order-no").textContent = no || "—";
     const isCash = (payway === "cash");
@@ -1571,9 +1603,29 @@ function cpFace(c){
     ? `<div class="v">${c.value}</div><div class="u">元</div>`
     : `<div class="v">${c.value}<span style="font-size:17px;">折</span></div><div class="u">全 單</div>`;
 }
+/* 品項券：找購物車裡「該品項」的單價（一份），沒有就回 null */
+function cartUnitPriceOf(pid){
+  if(!pid) return null;
+  var best = null;
+  for(var k in cart){
+    if(!(cart[k] > 0)) continue;
+    var parts = k.split("|"); var it = findItem(parts[0]);
+    if(!it) continue;
+    if(it.id === pid || it.docId === pid){
+      var up = ((it.vars[+parts[1]]||{}).p) || 0;
+      if(best == null || up < best) best = up;   /* 多種規格同時在車，取較便宜那份的價，店家不吃虧 */
+    }
+  }
+  return best;
+}
 function cpDiscount(c, sub){
   if(c.minSpend && sub < c.minSpend) return 0;
-  if(c.type==="gift") return 0;               /* 送品項不折現金 */
+  if(c.type==="gift"){
+    var up = cartUnitPriceOf(c.giftPid);
+    if(up == null) return 0;                    /* 該品項還沒加入購物車 → 不折 */
+    var disc = (c.giftDiscount > 0) ? Math.min(c.giftDiscount, up) : up;  /* 0/未設 = 免費送整份 */
+    return Math.min(disc, sub);
+  }
   if(c.type==="amount") return Math.min(c.value, sub);
   if(c.type==="percent") return Math.floor(sub * (10 - c.value) / 10);
   return 0;
@@ -2055,7 +2107,7 @@ if(cfg.apiKey && cfg.projectId){
     const paid = qs.get("paid");
     if(paid !== null){
       history.replaceState({}, "", location.pathname);
-      cart = {};   // 清空購物車
+      cart = {}; try{ if(typeof clearCartStore==="function") clearCartStore(); }catch(e){}   // 清空購物車
       if(paid === "1"){
         setTimeout(()=>alert("付款流程已完成，可至會員中心查看訂單狀態。"), 400);
       } else {
@@ -2093,7 +2145,7 @@ if(cfg.apiKey && cfg.projectId){
       if(!items.length && g.type){
         if(g.type==="points") items=[{type:"points", points:g.points||0}];
         else if(g.type==="coupon") items=[{type:"amount", name:g.cpName||"新會員折價券", value:g.cpValue||0, min:g.cpMin||0}];
-        else if(g.type==="gift") items=[{type:"gift", giftPid:g.giftPid||"", giftName:g.giftName||"贈品"}];
+        else if(g.type==="gift") items=[{type:"gift", giftPid:g.giftPid||"", giftName:g.giftName||"贈品", giftDiscount:g.giftDiscount||0}];
       }
       if(!items.length){ console.warn("fbGrantSignup：無有效註冊禮，跳過", g); return undefined; }
       const memberPatch = { signupGifted: true };
@@ -2107,7 +2159,7 @@ if(cfg.apiKey && cfg.projectId){
           await addDoc(collection(db,"usercoupons"), {uid, name: it.name||"新會員折扣券", type:"percent", value: it.value||0, min: it.min||0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
           granted=true;
         } else if(it.type==="gift"){
-          await addDoc(collection(db,"usercoupons"), {uid, name: it.giftName? ("新會員贈品｜"+it.giftName) : "新會員贈品", type:"gift", giftPid: it.giftPid||"", giftName: it.giftName||"贈品", min:0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
+          await addDoc(collection(db,"usercoupons"), {uid, name: it.giftName? ("新會員贈品｜"+it.giftName) : "新會員贈品", type:"gift", giftPid: it.giftPid||"", giftName: it.giftName||"贈品", giftDiscount: it.giftDiscount||0, min:0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
           granted=true;
         }
       }
@@ -2125,7 +2177,7 @@ if(cfg.apiKey && cfg.projectId){
       const expStr = e.getFullYear()+"-"+String(e.getMonth()+1).padStart(2,"0")+"-"+String(e.getDate()).padStart(2,"0");
       const cData = { uid, name: r.name||"兌換券", type:(r.type||"amount"), minSpend: r.minSpend||0,
         expire: expStr, used:false, source:"redeem", fromRedeem:true, cost, createdAt: serverTimestamp() };
-      if(r.type==="gift"){ cData.value=0; cData.giftName=r.giftName||"贈品"; if(r.giftKey){ cData.giftPid=String(r.giftKey).split("|")[0]; } }
+      if(r.type==="gift"){ cData.value=0; cData.giftName=r.giftName||"贈品"; cData.giftDiscount=r.giftDiscount||0; if(r.giftKey){ cData.giftPid=String(r.giftKey).split("|")[0]; } }
       else { cData.value = r.value||0; }
       const cref = doc(collection(db,"usercoupons"));
       const batch = writeBatch(db);
