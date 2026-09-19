@@ -1841,17 +1841,20 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
-/* 依寬度把字串折行（中文無空白、逐字量測），回傳多行陣列，避免加料字串印超出紙寬被切掉 */
+/* 依寬度折行：優先在「、」頓號後斷行（每個配料整塊不拆、頓號留行尾，不讓「、」跑到行首）；
+   單一段落若比一行還長，才退回逐字折。避免加料字串印超出紙寬、也避免斷在奇怪的位置 */
 function wrapByWidth(ctx, text, font, maxW){
   ctx.font = font;
-  var lines=[], cur="";
   text = String(text==null?"":text);
-  for(var i=0;i<text.length;i++){
-    var ch=text[i];
-    if(ch==="\n"){ lines.push(cur); cur=""; continue; }
-    var test=cur+ch;
-    if(ctx.measureText(test).width > maxW && cur!==""){ lines.push(cur); cur=ch; }
-    else { cur=test; }
+  var opts = text.split("、");
+  var lines=[], cur="";
+  for(var k=0;k<opts.length;k++){
+    var opt=opts[k];
+    var cand = cur==="" ? opt : cur+"、"+opt;
+    if(ctx.measureText(cand).width <= maxW){ cur=cand; continue; }
+    if(cur!==""){ lines.push(cur); cur=""; }
+    if(ctx.measureText(opt).width <= maxW){ cur=opt; }
+    else { for(var j=0;j<opt.length;j++){ var ch=opt[j]; if(cur!=="" && ctx.measureText(cur+ch).width > maxW){ lines.push(cur); cur=ch; } else { cur+=ch; } } }
   }
   if(cur!=="") lines.push(cur);
   return lines.length? lines : [""];
@@ -1905,8 +1908,8 @@ function renderTicketImage(d){
     h += 50 + (itemSub(x) ? 34 : 0) + addH + 20;
   });
   h += 14;
-  if(d.sauce && d.sauce!=="-" && d.sauce!==""){   /* 加料（整單）：逐段折行量高 */
-    let sH=0; String(d.sauce).split("　").forEach(function(p){ sH += wrapByWidth(ctx,p,F_BODY,W-PAD-(PAD+88)).length*34; });
+  if(d.sauce && d.sauce!=="-" && d.sauce!==""){   /* 加料（整單）：標題行 + 逐段折行量高 */
+    let sH=34; String(d.sauce).split("　").forEach(function(p){ sH += wrapByWidth(ctx,p,F_BODY,W-PAD-(PAD+24)).length*34; });
     h += sH + 14;
   }
   if(d.shipFee) h += 46;
@@ -2040,11 +2043,11 @@ function renderTicketImage(d){
 
   y += 14;
 
-  /* 加料（整單，移到品項下方）：逐段折行，避免長字串印出紙外 */
+  /* 加料（整單，移到品項下方）：標題自成一行，內容較寬、逐段折行，避免斷在奇怪位置或印出紙外 */
   if(d.sauce && d.sauce!=="-" && d.sauce!==""){
     ctx.font=F_BODY; ctx.textAlign="left"; ctx.fillStyle="#000";
-    ctx.fillText("加料", PAD, y);
-    var vx = PAD + 88;
+    ctx.fillText("加料", PAD, y); y += 34;
+    var vx = PAD + 24;
     String(d.sauce).split("　").forEach(function(p){
       wrapByWidth(ctx, p, F_BODY, W-PAD-vx).forEach(function(ln){ ctx.textAlign="left"; ctx.fillText(ln, vx, y); y += 34; });
     });
