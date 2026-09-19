@@ -1614,33 +1614,20 @@ window.closeRedeemModal = function(){ var m=document.getElementById("redeem-moda
 window.doRedeemPoint = async function(idx){
   const catalog = SETTINGS.redeemCatalog || [];
   const r = catalog[idx]; if(!r) return;
-  const pts = member?.available ?? member?.points ?? 0;
-  if(pts < r.pts){ alert("點數不足"); return; }
+  if(!member || !member.uid){ alert("請先登入會員再兌換"); return; }
+  const avail = member.available ?? member.points ?? 0;   /* 可花的點：扣掉未結訂單佔用後的餘額 */
+  if(avail < r.pts){ alert("點數不足"); return; }
   if(!confirm("確定用 " + r.pts + " 點兌換「" + r.name + "」？")) return;
   try{
-    const expDays = r.days || 30;
-    const exp = new Date(Date.now() + expDays*86400000).toISOString().slice(0,10);
-    var couponData = {
-      name: r.name, type: (r.type||"amount"), minSpend: r.minSpend||0,
-      channels: CH.map(function(c){return c.k;}), expire: exp, used: false,
-      createdAt: serverTimestamp(), fromRedeem: true, cost: r.pts
-    };
-    if(r.type==="gift"){
-      couponData.value = 0;
-      couponData.giftName = r.giftName || "贈品";
-      if(r.giftKey){ couponData.giftPid = String(r.giftKey).split("|")[0]; }
-    } else {
-      couponData.value = r.value;
-    }
-    await addDoc(collection(db,"members",member.docId,"coupons"), couponData);
-    const newAvail = pts - r.pts;
-    await updateDoc(doc(db,"members",member.docId), { available: newAvail });
-    member.available = newAvail;
+    if(typeof window.fbRedeemPoint !== "function"){ alert("系統尚未就緒，請重新整理頁面後再試一次。"); return; }
+    const newPts = await window.fbRedeemPoint(member.uid, r, member.points||0);
+    if(typeof newPts === "number") member.points = newPts;
+    if(member.available != null) member.available = Math.max(0, member.available - r.pts);
     alert("兌換成功！優惠券已發送到你的帳戶。");
     closeRedeemModal();
-    if(typeof loadMemberCoupons==="function") await loadMemberCoupons();
-    if(typeof renderMember==="function") renderMember();
-  }catch(e){ console.error("兌換失敗", e); alert("兌換失敗：" + e.message); }
+    if(typeof refreshCoupons === "function") await refreshCoupons();
+    if(typeof renderMember === "function") renderMember();
+  }catch(e){ console.error("兌換失敗", e); alert("兌換失敗：" + (e.message||e)); }
 };
 async function ensureRefCode(){
   if(!member || member.refCode) return;
@@ -1932,7 +1919,7 @@ const badge = document.getElementById("mode-badge");
 if(cfg.apiKey && cfg.projectId){
   try{
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc, where, updateDoc, setDoc, limit } =
+    const { getFirestore, collection, getDocs, addDoc, serverTimestamp, query, orderBy, doc, getDoc, where, updateDoc, setDoc, limit, writeBatch } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     const { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } =
       await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
@@ -2127,6 +2114,25 @@ if(cfg.apiKey && cfg.projectId){
       if(!granted) return undefined;
       await setDoc(doc(db,"members",uid), memberPatch, {merge:true});
       return memberPatch.points;
+    };
+
+    /* 點數兌換：發一張券到 usercoupons(source:redeem)並扣點，兩件事用 batch 一起成敗，避免扣了點卻沒發券 */
+    window.fbRedeemPoint = async (uid, r, curPoints)=>{
+      const cost = r.pts||0;
+      if((curPoints||0) < cost) throw new Error("點數不足");
+      const days = r.days || 30;
+      const e = new Date(Date.now()+days*86400000);
+      const expStr = e.getFullYear()+"-"+String(e.getMonth()+1).padStart(2,"0")+"-"+String(e.getDate()).padStart(2,"0");
+      const cData = { uid, name: r.name||"兌換券", type:(r.type||"amount"), minSpend: r.minSpend||0,
+        expire: expStr, used:false, source:"redeem", fromRedeem:true, cost, createdAt: serverTimestamp() };
+      if(r.type==="gift"){ cData.value=0; cData.giftName=r.giftName||"贈品"; if(r.giftKey){ cData.giftPid=String(r.giftKey).split("|")[0]; } }
+      else { cData.value = r.value||0; }
+      const cref = doc(collection(db,"usercoupons"));
+      const batch = writeBatch(db);
+      batch.set(cref, cData);
+      batch.update(doc(db,"members",uid), { points: (curPoints||0) - cost });
+      await batch.commit();
+      return (curPoints||0) - cost;
     };
 
     window.fbSaveMember = async (uid, data)=>{
