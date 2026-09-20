@@ -1,0 +1,12 @@
+{
+  "name": "三代傳會員點餐系統",
+  "short_name": "三代傳",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#6F2222",
+  "theme_color": "#6F2222",
+  "icons": [
+    { "src": "icon.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" }
+  ]
+}
