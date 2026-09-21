@@ -1045,7 +1045,7 @@ function renderCpBox(){
   $("cp-options").innerHTML = list.map(c=>`
     <div class="cp-pick ${cpSel===c.docId?"on":""}" onclick="selCoupon('${c.docId}')" style="margin-bottom:8px;">
       <div class="l">
-        <div class="t">${c.name}　${cpIsGift(c)? (cartUnitPriceOf(c.giftPid)!=null? ("🎁 "+(c.giftName||"品項")+"　"+((c.giftDiscount>0)? ("折 "+money(Math.min(c.giftDiscount, cartUnitPriceOf(c.giftPid)))) : "免費")) : ("🎁 "+(c.giftName||"品項")+"（需先加入購物車）")) : "−"+money(cpDiscount(c, sub))}</div>
+        <div class="t">${c.name}　${cpIsGift(c)? cpGiftCap(c) : "−"+money(cpDiscount(c, sub))}</div>
         <div class="d">${c.minSpend? "滿 "+money(c.minSpend)+" 可用・":""}${c.expire.replace(/-/g,"/")} 到期</div>
       </div>
       <span class="go">${cpSel===c.docId? "已選用 ✓":"選用 ›"}</span>
@@ -1630,7 +1630,14 @@ function cpDiscount(c, sub){
   if(c.type==="gift"){
     var up = cartUnitPriceOf(c.giftPid);
     if(up == null) return 0;                    /* 該品項還沒加入購物車 → 不折 */
-    var disc = (c.giftDiscount > 0) ? Math.min(c.giftDiscount, up) : up;  /* 0/未設 = 免費送整份 */
+    var disc;
+    if(c.giftPrice != null && c.giftPrice !== "" && Number(c.giftPrice) >= 0){
+      disc = Math.max(0, up - Number(c.giftPrice));   /* 優惠價：原價 - 售價，系統自動對菜單 */
+    } else if(c.giftDiscount > 0){
+      disc = Math.min(c.giftDiscount, up);             /* 舊「折抵$X」相容 */
+    } else {
+      disc = up;                                       /* 免費送整份 */
+    }
     return Math.min(disc, sub);
   }
   if(c.type==="amount") return Math.min(c.value, sub);
@@ -1639,6 +1646,17 @@ function cpDiscount(c, sub){
 }
 function cpIsGift(c){ return c && c.type==="gift"; }
 function cpGiftOk(c, sub){ return cpIsGift(c) && (!c.minSpend || sub >= c.minSpend); }
+function cpGiftCap(c){
+  var nm = "🎁 " + (c.giftName||"品項");
+  var up = cartUnitPriceOf(c.giftPid);
+  if(up == null) return nm + "（需先加入購物車）";
+  if(c.giftPrice != null && c.giftPrice !== "" && Number(c.giftPrice) >= 0){
+    var save = Math.max(0, up - Number(c.giftPrice));
+    return nm + "　優惠價 " + money(Number(c.giftPrice)) + (save>0? ("（省"+money(save)+"）") : "");
+  }
+  if(c.giftDiscount > 0) return nm + "　折 " + money(Math.min(c.giftDiscount, up));
+  return nm + "　免費";
+}
 async function refreshCoupons(){
   if(!member || !window.fbLoadCoupons){ MY_CP = []; return; }
   MY_CP = await window.fbLoadCoupons(member.uid);
@@ -2166,7 +2184,7 @@ if(cfg.apiKey && cfg.projectId){
           await addDoc(collection(db,"usercoupons"), {uid, name: it.name||"新會員折扣券", type:"percent", value: it.value||0, min: it.min||0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
           granted=true;
         } else if(it.type==="gift"){
-          await addDoc(collection(db,"usercoupons"), {uid, name: it.giftName? ("新會員贈品｜"+it.giftName) : "新會員贈品", type:"gift", giftPid: it.giftPid||"", giftName: it.giftName||"贈品", giftDiscount: it.giftDiscount||0, min:0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
+          await addDoc(collection(db,"usercoupons"), {uid, name: it.giftName? ("新會員贈品｜"+it.giftName) : "新會員贈品", type:"gift", giftPid: it.giftPid||(it.giftKey? String(it.giftKey).split("|")[0]:""), giftKey: it.giftKey||"", giftName: it.giftName||"贈品", giftPrice: (it.giftPrice!=null && it.giftPrice!=="")? Number(it.giftPrice) : null, giftDiscount: it.giftDiscount||0, min:0, expire: expStr, used:false, source:"signup", createdAt: serverTimestamp()});
           granted=true;
         }
       }
@@ -2184,7 +2202,7 @@ if(cfg.apiKey && cfg.projectId){
       const expStr = e.getFullYear()+"-"+String(e.getMonth()+1).padStart(2,"0")+"-"+String(e.getDate()).padStart(2,"0");
       const cData = { uid, name: r.name||"兌換券", type:(r.type||"amount"), minSpend: r.minSpend||0,
         expire: expStr, used:false, source:"redeem", fromRedeem:true, cost, createdAt: serverTimestamp() };
-      if(r.type==="gift"){ cData.value=0; cData.giftName=r.giftName||"贈品"; cData.giftDiscount=r.giftDiscount||0; if(r.giftKey){ cData.giftPid=String(r.giftKey).split("|")[0]; } }
+      if(r.type==="gift"){ cData.value=0; cData.giftName=r.giftName||"贈品"; cData.giftPrice=(r.giftPrice!=null && r.giftPrice!=="")? Number(r.giftPrice) : null; cData.giftDiscount=r.giftDiscount||0; cData.giftPid = r.giftPid || (r.giftKey? String(r.giftKey).split("|")[0] : ""); if(r.giftKey) cData.giftKey=r.giftKey; }
       else { cData.value = r.value||0; }
       const cref = doc(collection(db,"usercoupons"));
       const batch = writeBatch(db);
