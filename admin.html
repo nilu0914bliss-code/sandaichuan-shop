@@ -540,14 +540,14 @@
               <div class="cp-fld"><label>這份要——</label>
                 <div class="seg" style="flex-wrap:wrap;">
                   <button class="seg-b on" id="sg-gm-free" onclick="setSgGiftMode('free')">免費送</button>
-                  <button class="seg-b" id="sg-gm-disc" onclick="setSgGiftMode('disc')">折抵金額</button>
+                  <button class="seg-b" id="sg-gm-price" onclick="setSgGiftMode('price')">優惠價</button>
                 </div>
-                <div id="sg-gdisc-wrap" style="display:none;align-items:center;gap:8px;margin-top:7px;">
-                  <span style="font-size:13px;color:var(--ink-soft);">折抵</span>
-                  <input type="number" id="sg-gdisc" min="1" placeholder="例：20" style="width:100px;">
+                <div id="sg-gprice-wrap" style="display:none;align-items:center;gap:8px;margin-top:7px;">
+                  <span style="font-size:13px;color:var(--ink-soft);">優惠價</span>
+                  <input type="number" id="sg-gprice" min="0" placeholder="例：199" style="width:100px;">
                   <span style="font-size:13px;color:var(--ink-soft);">元</span>
                 </div>
-                <div class="hint" style="margin-top:6px;">免費送＝客人購物車有這個品項就變 $0（系統自動抓價）。折抵金額＝購物車有這個品項就折你填的金額。客人都要先把該品項加入購物車才能用。</div>
+                <div class="hint" style="margin-top:6px;">免費送＝客人購物車有這個品項就變 $0（系統自動抓菜單價）。優惠價＝購物車有這個品項就用你填的售價，系統自動對菜單原價算折扣、永遠同步。客人都要先把該品項加入購物車才能用。</div>
               </div>
             </div>
             <button class="btn btn-sm" onclick="addSignupItem()">＋ 新增這份</button>
@@ -614,9 +614,9 @@
                 <select id="rd-gift" style="flex:1;min-width:130px;padding:8px;border:1px solid var(--line);border-radius:5px;font-family:inherit;"></select>
                 <div class="seg" style="flex-wrap:wrap;">
                   <button type="button" class="seg-b on" id="rd-gm-free" onclick="setRdGiftMode('free')">免費送</button>
-                  <button type="button" class="seg-b" id="rd-gm-disc" onclick="setRdGiftMode('disc')">折抵金額</button>
+                  <button type="button" class="seg-b" id="rd-gm-price" onclick="setRdGiftMode('price')">優惠價</button>
                 </div>
-                <span id="rd-gdisc-box" style="display:none;align-items:center;gap:4px;"><span style="font-size:12px;color:var(--ink-soft);">折抵</span><input type="number" id="rd-gdisc" placeholder="例:20" style="width:70px;"><span style="font-size:12px;color:var(--ink-soft);">元</span></span>
+                <span id="rd-gprice-box" style="display:none;align-items:center;gap:4px;"><span style="font-size:12px;color:var(--ink-soft);">優惠價</span><input type="number" id="rd-gprice" placeholder="例:199" style="width:70px;"><span style="font-size:12px;color:var(--ink-soft);">元</span></span>
                 <span style="font-size:12px;color:var(--ink-soft);">門檻</span>
                 <input type="number" id="rd-gmin" placeholder="0" style="width:70px;"><span style="font-size:12px;color:var(--ink-soft);">元</span>
               </div>
@@ -1417,16 +1417,18 @@ window.setSgAddType = setSgAddType;
 window.SG_GIFT_MODE = "free";
 window.setSgGiftMode = function(m){
   window.SG_GIFT_MODE = m;
-  var f=document.getElementById("sg-gm-free"), d=document.getElementById("sg-gm-disc");
+  var f=document.getElementById("sg-gm-free"), d=document.getElementById("sg-gm-price");
   if(f) f.classList.toggle("on", m==="free");
-  if(d) d.classList.toggle("on", m==="disc");
-  var w=document.getElementById("sg-gdisc-wrap"); if(w) w.style.display = (m==="disc")? "flex":"none";
+  if(d) d.classList.toggle("on", m==="price");
+  var w=document.getElementById("sg-gprice-wrap"); if(w) w.style.display = (m==="price")? "flex":"none";
 };
 
 function sgFillGiftOptions(){
   var sel=document.getElementById("sg-gift");
   if(sel && typeof PRODUCTS!=="undefined"){
-    sel.innerHTML = PRODUCTS.map(function(p){ return '<option value="'+(p.pid||p.docId)+'">'+esc(p.n)+'</option>'; }).join("");
+    var opts=[];
+    PRODUCTS.forEach(function(p){ (p.vars||[]).forEach(function(v,vi){ opts.push('<option value="'+(p.pid||p.docId)+'|'+vi+'">'+esc(p.n)+(v.v?"（"+esc(v.v)+"）":"")+'</option>'); }); });
+    sel.innerHTML = opts.join("") || '<option value="">目前沒有商品</option>';
   }
 }
 function renderSignupItems(){
@@ -1436,7 +1438,7 @@ function renderSignupItems(){
     var desc;
     if(it.type==="amount") desc=esc(it.name||"折價券")+' <span style="color:var(--wine);">(折抵 $'+(it.value||0)+(it.min?'・滿 $'+it.min:'')+')</span>';
     else if(it.type==="percent") desc=esc(it.name||"折扣券")+' <span style="color:var(--wine);">('+(it.value||0)+' 折'+(it.min?'・滿 $'+it.min:'')+')</span>';
-    else desc='🎁 '+esc(it.giftName||"品項")+' <span style="color:var(--wine);">('+((it.giftDiscount>0)?('折 $'+it.giftDiscount):'免費')+')</span>';
+    else { var gm=(it.giftPrice!=null&&it.giftPrice!=="")?('優惠價 $'+it.giftPrice):((it.giftDiscount>0)?('折 $'+it.giftDiscount):'免費'); desc='🎁 '+esc(it.giftName||"品項")+' <span style="color:var(--wine);">('+gm+')</span>'; }
     return '<div class="rd-row"><div class="rd-body" style="flex:1;"><div>'+desc+'</div></div>'
       +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delSignupItem('+i+')">刪除</button></div>';
   }).join('');
@@ -1449,10 +1451,14 @@ window.addSignupItem=function(){
   if(t==="gift"){
     var gk=(document.getElementById("sg-gift")||{}).value||"";
     if(!gk){ alert("請選擇贈送品項"); return; }
-    var pp=(typeof PRODUCTS!=="undefined")? PRODUCTS.find(function(x){return (x.pid||x.docId)===gk;}) : null;
-    it.giftPid=gk; it.giftName=pp? pp.n : "贈品";
-    it.giftDiscount = (window.SG_GIFT_MODE==="disc")? (num("sg-gdisc")||0) : 0;
-    if(window.SG_GIFT_MODE==="disc" && !it.giftDiscount){ alert("請填折抵金額"); return; }
+    var pr=String(gk).split("|"), gpid=pr[0], gvi=pr[1];
+    var pp=(typeof PRODUCTS!=="undefined")? PRODUCTS.find(function(x){return (x.pid||x.docId)===gpid;}) : null;
+    var vn=(pp&&pp.vars&&gvi!=null&&pp.vars[gvi]&&pp.vars[gvi].v)? ("（"+pp.vars[gvi].v+"）") : "";
+    it.giftPid=gpid; it.giftKey=gk; it.giftName=(pp? pp.n : "贈品")+vn;
+    if(window.SG_GIFT_MODE==="price"){
+      var gpv=num("sg-gprice"); if(gpv<0) gpv=0;
+      it.giftPrice = gpv; it.giftDiscount = 0;
+    } else { it.giftPrice = null; it.giftDiscount = 0; }
   } else {
     var vv=num("sg-cp-value"); if(!vv){ alert(t==="percent"?"請填折數":"請填折抵金額"); return; }
     it.name=valTrim("sg-cp-name")||(t==="percent"?"新會員折扣券":"新會員折價券");
@@ -1460,7 +1466,7 @@ window.addSignupItem=function(){
   }
   SIGNUP_ITEMS.push(it); renderSignupItems(); renderSignupBadge();
   var nm=$("sg-cp-name"); if(nm) nm.value="";
-  var gd=$("sg-gdisc"); if(gd) gd.value="";
+  var gd=$("sg-gprice"); if(gd) gd.value="";
 };
 function renderSignupBadge(){
   var g=GLOBAL.signupGift||{};
@@ -2718,7 +2724,7 @@ function renderRedeemList(){
   if(!REDEEM_CATALOG.length){ el.innerHTML='<div class="hint">尚未設定任何兌換選項。</div>'; return; }
   el.innerHTML=REDEEM_CATALOG.map(function(r,i){
     return '<div class="rd-row"><div class="rd-pts">'+r.pts+' 點</div>'
-      +'<div class="rd-body"><div>'+esc(r.name)+' <span style="color:var(--wine);font-size:11px;">('+(r.type==="percent"?(r.value+" 折"):r.type==="gift"?("🎁 "+esc(r.giftName||"品項")+"・"+((r.giftDiscount>0)?("折 $"+r.giftDiscount):"免費")):("折 $"+r.value))+')</span>'+(r.minSpend?' · 滿 $'+r.minSpend+' 可用':'')+'</div>'
+      +'<div class="rd-body"><div>'+esc(r.name)+' <span style="color:var(--wine);font-size:11px;">('+(r.type==="percent"?(r.value+" 折"):r.type==="gift"?("🎁 "+esc(r.giftName||"品項")+"・"+((r.giftPrice!=null&&r.giftPrice!=="")?("優惠價 $"+r.giftPrice):(r.giftDiscount>0)?("折 $"+r.giftDiscount):"免費")):("折 $"+r.value))+')</span>'+(r.minSpend?' · 滿 $'+r.minSpend+' 可用':'')+'</div>'
       +'<div class="rd-sub">拿到後 '+(r.days||30)+' 天內使用</div></div>'
       +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delRedeemItem('+i+')">刪除</button></div>';
   }).join('');
@@ -2739,10 +2745,10 @@ window.setRdType=function(t){
 window.RD_GIFT_MODE="free";
 window.setRdGiftMode=function(m){
   window.RD_GIFT_MODE=m;
-  var f=$("rd-gm-free"), d=$("rd-gm-disc");
+  var f=$("rd-gm-free"), d=$("rd-gm-price");
   if(f) f.classList.toggle("on",m==="free");
-  if(d) d.classList.toggle("on",m==="disc");
-  var b=$("rd-gdisc-box"); if(b) b.style.display=(m==="disc")?"inline-flex":"none";
+  if(d) d.classList.toggle("on",m==="price");
+  var b=$("rd-gprice-box"); if(b) b.style.display=(m==="price")?"inline-flex":"none";
 };
 function fillRdGiftOptions(){
   var sel=$("rd-gift"); if(!sel) return;
@@ -2758,16 +2764,16 @@ window.addRedeemItem=function(){
     var gk=($("rd-gift")||{}).value||""; if(!gk){ alert("請選擇贈送品項"); return; }
     var pr=gk.split("|"); var pp=PRODUCTS.find(function(x){return x.docId===pr[0];});
     var vn=(pp&&pp.vars[+pr[1]]&&pp.vars[+pr[1]].v)?("（"+pp.vars[+pr[1]].v+"）"):"";
-    item.giftKey=gk; item.giftName=pp?(pp.n+vn):"贈品"; item.value=0; item.minSpend=num("rd-gmin");
-    item.giftDiscount=(window.RD_GIFT_MODE==="disc")?(num("rd-gdisc")||0):0;
-    if(window.RD_GIFT_MODE==="disc" && !item.giftDiscount){ alert("請填折抵金額"); return; }
+    item.giftPid=pr[0]; item.giftKey=gk; item.giftName=pp?(pp.n+vn):"贈品"; item.value=0; item.minSpend=num("rd-gmin");
+    if(window.RD_GIFT_MODE==="price"){ var gpv=num("rd-gprice"); if(gpv<0) gpv=0; item.giftPrice=gpv; item.giftDiscount=0; }
+    else { item.giftPrice=null; item.giftDiscount=0; }
   } else {
     var vv=num("rd-value"); if(!vv){ alert(item.type==="percent"?"請填折數":"請填折抵金額"); return; }
     item.value=vv; item.minSpend=num("rd-min");
   }
   REDEEM_CATALOG.push(item);
   REDEEM_CATALOG.sort(function(a,b){return a.pts-b.pts;});
-  ["rd-pts","rd-name","rd-value","rd-min","rd-gmin","rd-gdisc"].forEach(function(id){ var el=$(id); if(el) el.value=""; }); setV("rd-days",30);
+  ["rd-pts","rd-name","rd-value","rd-min","rd-gmin","rd-gprice"].forEach(function(id){ var el=$(id); if(el) el.value=""; }); setV("rd-days",30);
   renderRedeemList();
 };
 window.saveRedeemCatalog=async function(){
