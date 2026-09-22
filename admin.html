@@ -564,6 +564,76 @@
         </div></div>
       </div>
 
+      <!-- 生日禮（生日當月自動發放；後台可一鍵補發本月壽星） -->
+      <div class="scard" id="sc-birthday">
+        <div class="scard-h" onclick="toggleCard('sc-birthday',event)">
+          <i class="ic">🎂</i><span class="t">生日禮</span><span class="scope-tag scope-all">全店共用</span>
+          <span class="sbadge" id="badge-birthday"></span><span class="arr">▾</span>
+        </div>
+        <div class="scard-b"><div class="inner">
+          <div class="hint" style="margin:0 0 10px;padding:9px 11px;background:var(--cream-soft);border-radius:6px;border-left:3px solid var(--wine);">
+            <b>生日當月</b>發放，每位壽星每年只發一次（系統記年份、不會重複發）。<br>
+            <b>自動：</b>壽星在生日當月打開 App／進會員頁時自動領到（含當月新加入的壽星）。<br>
+            <b>補發：</b>當月沒開 App 的壽星，用下面「發放本月壽星生日禮」一鍵補發。
+          </div>
+
+          <div class="sw-row"><span class="l">啟用生日禮</span><button class="switch" id="sw-birthday"></button></div>
+
+          <div class="cat-title" style="margin-top:4px;">已設定的生日禮（最多 3 份）</div>
+          <div id="bd-list"><div class="hint">尚未設定，請在下方新增。</div></div>
+
+          <div class="add-card" style="margin-top:12px;">
+            <div class="cp-fld"><label>新增一份・類型</label>
+              <div class="seg" style="flex-wrap:wrap;">
+                <button class="seg-b on" id="bd-t-amount" onclick="setBdAddType('amount')">折抵券</button>
+                <button class="seg-b" id="bd-t-percent" onclick="setBdAddType('percent')">打折券</button>
+                <button class="seg-b" id="bd-t-gift" onclick="setBdAddType('gift')">品項</button>
+              </div>
+            </div>
+            <div id="bd-cpname-wrap" class="cp-fld"><label>券名稱</label>
+              <input id="bd-cp-name" placeholder="例：生日折價券"></div>
+            <div id="bd-val-wrap">
+              <div style="display:flex;gap:8px;">
+                <div class="cp-fld" style="flex:1;"><label id="bd-vlabel">折抵金額</label>
+                  <input type="number" id="bd-cp-value" min="1" value="50"></div>
+                <div class="cp-fld" style="flex:1;"><label>最低消費</label>
+                  <input type="number" id="bd-cp-min" min="0" value="0" placeholder="0＝無門檻"></div>
+              </div>
+            </div>
+            <div id="bd-gift-wrap" style="display:none;">
+              <div class="cp-fld"><label>品項</label>
+                <select id="bd-gift"></select></div>
+              <div class="cp-fld"><label>這份要——</label>
+                <div class="seg" style="flex-wrap:wrap;">
+                  <button class="seg-b on" id="bd-gm-free" onclick="setBdGiftMode('free')">免費送</button>
+                  <button class="seg-b" id="bd-gm-price" onclick="setBdGiftMode('price')">優惠價</button>
+                </div>
+                <div id="bd-gprice-wrap" style="display:none;align-items:center;gap:8px;margin-top:7px;">
+                  <span style="font-size:13px;color:var(--ink-soft);">優惠價</span>
+                  <input type="number" id="bd-gprice" min="0" placeholder="例：199" style="width:100px;">
+                  <span style="font-size:13px;color:var(--ink-soft);">元</span>
+                </div>
+                <div class="hint" style="margin-top:6px;">免費送＝客人購物車有這個品項就變 $0（系統自動抓菜單價）。優惠價＝購物車有這個品項就用你填的售價，系統自動對菜單原價算折扣。客人都要先把該品項加入購物車才能用。</div>
+              </div>
+            </div>
+            <button class="btn btn-sm" onclick="addBirthdayItem()">＋ 新增這份</button>
+          </div>
+
+          <div class="cp-fld"><label>使用期限</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:var(--ink-soft);">領取後</span>
+              <input type="number" id="bd-days" min="1" value="30" style="width:80px;">
+              <span style="font-size:13px;color:var(--ink-soft);">天內使用完畢</span>
+            </div>
+          </div>
+
+          <div style="text-align:right;margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;">
+            <div class="hint" style="text-align:left;margin:0 0 6px;">補發前請先按最下面「儲存全部設定」存好生日禮內容。這顆只補發、不會重複發已領過今年的人。</div>
+            <button class="btn btn-sm" style="background:var(--wine);color:var(--cream);" onclick="grantTodayBirthday()">🎂 發放本月壽星生日禮</button>
+          </div>
+        </div></div>
+      </div>
+
       <div class="scard" id="sc-pointrule">
         <div class="scard-h" onclick="toggleCard('sc-pointrule',event)">
           <i class="ic">🪙</i><span class="t">消費點數規則</span><span class="scope-tag scope-all">全店共用</span>
@@ -804,7 +874,7 @@ if(!cfg.apiKey){ document.body.innerHTML = "<p style='padding:40px;text-align:ce
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
 const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-const { getFirestore, initializeFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction, getDocs, addDoc, deleteDoc } =
+const { getFirestore, initializeFirestore, collection, onSnapshot, query, where, orderBy, doc, updateDoc, serverTimestamp, getDoc, setDoc, runTransaction, getDocs, addDoc, deleteDoc } =
   await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
 
 const app = initializeApp(cfg);
@@ -1371,6 +1441,7 @@ $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); rende
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
 $("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
 $("sw-signup").onclick = ()=>{ const sw=$("sw-signup"); sw.classList.toggle("on"); };
+if($("sw-birthday")) $("sw-birthday").onclick = ()=>{ const sw=$("sw-birthday"); sw.classList.toggle("on"); renderBirthdayBadge(); };
 if($("sw-pointrule")) $("sw-pointrule").onclick = ()=>{ $("sw-pointrule").classList.toggle("on"); };
 if($("sw-referral")) $("sw-referral").onclick = ()=>{ $("sw-referral").classList.toggle("on"); };
 window.toggleCard = (id, e)=>{
@@ -1396,7 +1467,7 @@ async function loadSettings(){
         s.exists()? s.data() : {});
     }
   }catch(e){ console.error("讀取設定失敗", e); }
-  renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift(); renderShopInfo();
+  renderSettings(); renderOff(); renderAnnPhoto(); renderSignupGift(); renderBirthdayGift(); renderShopInfo();
   /* 設定載入完成後補畫菜單，讓分類順序/隱藏在後台也立即套用（修：後台顯示舊順序） */
   if(typeof renderMenu==="function" && Array.isArray(PRODUCTS) && PRODUCTS.length) renderMenu();
 }
@@ -1495,6 +1566,125 @@ function collectSignupGift(){
   return { on: sw? sw.classList.contains("on"):true, days: num("sg-days")||3, items: SIGNUP_ITEMS.slice() };
 }
 
+/* ── 生日禮設定（結構同註冊禮；生日當月自動發放＋後台一鍵補發）── */
+let BIRTHDAY_ITEMS = [];
+window.BD_ADD_TYPE = "amount";
+window.BD_GIFT_MODE = "free";
+function setBdAddType(t){
+  window.BD_ADD_TYPE = t;
+  ["amount","percent","gift"].forEach(function(k){ var b=document.getElementById("bd-t-"+k); if(b) b.classList.toggle("on", k===t); });
+  var isGift=(t==="gift");
+  var cw=document.getElementById("bd-cpname-wrap"), vw=document.getElementById("bd-val-wrap"), gw=document.getElementById("bd-gift-wrap");
+  if(cw) cw.style.display=isGift?"none":"block";
+  if(vw) vw.style.display=isGift?"none":"block";
+  if(gw) gw.style.display=isGift?"block":"none";
+  var vl=document.getElementById("bd-vlabel"); if(vl) vl.textContent=(t==="percent")?"折數（例 9＝九折）":"折抵金額";
+  if(isGift){ bdFillGiftOptions(); setBdGiftMode(window.BD_GIFT_MODE||"free"); }
+}
+window.setBdAddType=setBdAddType;
+window.setBdGiftMode=function(m){
+  window.BD_GIFT_MODE=m;
+  var f=document.getElementById("bd-gm-free"), d=document.getElementById("bd-gm-price");
+  if(f) f.classList.toggle("on", m==="free");
+  if(d) d.classList.toggle("on", m==="price");
+  var w=document.getElementById("bd-gprice-wrap"); if(w) w.style.display=(m==="price")?"flex":"none";
+};
+function bdFillGiftOptions(){
+  var sel=document.getElementById("bd-gift");
+  if(sel && typeof PRODUCTS!=="undefined"){
+    var opts=[];
+    PRODUCTS.forEach(function(p){ (p.vars||[]).forEach(function(v,vi){ opts.push('<option value="'+(p.pid||p.docId)+'|'+vi+'">'+esc(p.n)+(v.v?"（"+esc(v.v)+"）":"")+'</option>'); }); });
+    sel.innerHTML=opts.join("")||'<option value="">目前沒有商品</option>';
+  }
+}
+function renderBirthdayItems(){
+  var el=document.getElementById("bd-list"); if(!el) return;
+  if(!BIRTHDAY_ITEMS.length){ el.innerHTML='<div class="hint">尚未設定，請在下方新增。</div>'; return; }
+  el.innerHTML=BIRTHDAY_ITEMS.map(function(it,i){
+    var desc;
+    if(it.type==="amount") desc=esc(it.name||"折價券")+' <span style="color:var(--wine);">(折抵 $'+(it.value||0)+(it.min?'・滿 $'+it.min:'')+')</span>';
+    else if(it.type==="percent") desc=esc(it.name||"折扣券")+' <span style="color:var(--wine);">('+(it.value||0)+' 折'+(it.min?'・滿 $'+it.min:'')+')</span>';
+    else { var gm=(it.giftPrice!=null&&it.giftPrice!=="")?('優惠價 $'+it.giftPrice):((it.giftDiscount>0)?('折 $'+it.giftDiscount):'免費'); desc='🎁 '+esc(it.giftName||"品項")+' <span style="color:var(--wine);">('+gm+')</span>'; }
+    return '<div class="rd-row"><div class="rd-body" style="flex:1;"><div>'+desc+'</div></div>'
+      +'<button class="btn btn-sm" style="background:none;border:1px solid #C8351F;color:#C8351F;padding:3px 10px;" onclick="delBirthdayItem('+i+')">刪除</button></div>';
+  }).join('');
+}
+window.delBirthdayItem=function(i){ BIRTHDAY_ITEMS.splice(i,1); renderBirthdayItems(); renderBirthdayBadge(); };
+window.addBirthdayItem=function(){
+  if(BIRTHDAY_ITEMS.length>=3){ alert("最多只能放 3 份喔"); return; }
+  var t=window.BD_ADD_TYPE||"amount";
+  var it={type:t};
+  if(t==="gift"){
+    var gk=(document.getElementById("bd-gift")||{}).value||"";
+    if(!gk){ alert("請選擇贈送品項"); return; }
+    var pr=String(gk).split("|"), gpid=pr[0], gvi=pr[1];
+    var pp=(typeof PRODUCTS!=="undefined")? PRODUCTS.find(function(x){return (x.pid||x.docId)===gpid;}) : null;
+    var vn=(pp&&pp.vars&&gvi!=null&&pp.vars[gvi]&&pp.vars[gvi].v)? ("（"+pp.vars[gvi].v+"）") : "";
+    it.giftPid=gpid; it.giftKey=gk; it.giftName=(pp? pp.n : "贈品")+vn;
+    if(window.BD_GIFT_MODE==="price"){ var gpv=num("bd-gprice"); if(gpv<0) gpv=0; it.giftPrice=gpv; it.giftDiscount=0; }
+    else { it.giftPrice=null; it.giftDiscount=0; }
+  } else {
+    var vv=num("bd-cp-value"); if(!vv){ alert(t==="percent"?"請填折數":"請填折抵金額"); return; }
+    it.name=valTrim("bd-cp-name")||(t==="percent"?"生日折扣券":"生日折價券");
+    it.value=vv; it.min=num("bd-cp-min")||0;
+  }
+  BIRTHDAY_ITEMS.push(it); renderBirthdayItems(); renderBirthdayBadge();
+  var nm=$("bd-cp-name"); if(nm) nm.value="";
+  var gd=$("bd-gprice"); if(gd) gd.value="";
+};
+function renderBirthdayBadge(){
+  var g=GLOBAL.birthdayGift||{};
+  var badge=document.getElementById("badge-birthday");
+  if(badge) badge.textContent=(g.on===false||!g.on)?"關閉":(BIRTHDAY_ITEMS.length?("送 "+BIRTHDAY_ITEMS.length+" 份"):"未設定");
+}
+function renderBirthdayGift(){
+  var g=GLOBAL.birthdayGift||{};
+  var sw=document.getElementById("sw-birthday"); if(sw) sw.classList.toggle("on", !!g.on);
+  setV("bd-days", g.days!=null? g.days : 30);
+  BIRTHDAY_ITEMS = Array.isArray(g.items)? JSON.parse(JSON.stringify(g.items)) : [];
+  bdFillGiftOptions();
+  setBdAddType(window.BD_ADD_TYPE||"amount");
+  renderBirthdayItems();
+  renderBirthdayBadge();
+}
+function collectBirthdayGift(){
+  var sw=document.getElementById("sw-birthday");
+  return { on: sw? sw.classList.contains("on"):false, days: num("bd-days")||30, items: BIRTHDAY_ITEMS.slice() };
+}
+/* 後台一鍵補發本月壽星生日禮（店家帳號可發任何 uid；每人每年只發一次） */
+window.grantTodayBirthday = async function(){
+  var g = GLOBAL.birthdayGift || {};
+  if(!g.on || !(Array.isArray(g.items) && g.items.length)){ alert("生日禮尚未啟用或還沒設定內容，請先設定並按「儲存全部設定」。"); return; }
+  if(!confirm("要發放「本月壽星」生日禮嗎？\n（已領過今年的人會自動跳過，不會重複發）")) return;
+  try{
+    var mon = new Date().getMonth()+1;
+    var yr = new Date().getFullYear();
+    var days = g.days || 30;
+    var exp = new Date(); exp.setDate(exp.getDate()+days);
+    var expStr = exp.getFullYear()+"-"+String(exp.getMonth()+1).padStart(2,"0")+"-"+String(exp.getDate()).padStart(2,"0");
+    var msnap = await getDocs(collection(db,"members"));
+    var stars=[];
+    msnap.forEach(function(d){ var m=d.data(); var b=m.birth||""; if(b && (+String(b).split("-")[1]===mon)) stars.push(d.id); });
+    if(!stars.length){ alert("本月沒有壽星（沒有人的生日在這個月）。"); return; }
+    var granted=0, skipped=0;
+    for(var s=0;s<stars.length;s++){
+      var uid=stars[s];
+      var cs = await getDocs(query(collection(db,"usercoupons"), where("uid","==",uid)));
+      var has=false; cs.forEach(function(c){ if(c.data().bday===true && c.data().bdayYear===yr) has=true; });
+      if(has){ skipped++; continue; }
+      for(var k=0;k<g.items.length;k++){
+        var it=g.items[k];
+        var base={uid:uid, expire:expStr, used:false, source:"signup", bday:true, bdayYear:yr, createdAt:serverTimestamp()};
+        if(it.type==="amount") await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name:it.name||"生日折價券", type:"amount", value:it.value||0, min:it.min||0}));
+        else if(it.type==="percent") await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name:it.name||"生日折扣券", type:"percent", value:it.value||0, min:it.min||0}));
+        else if(it.type==="gift") await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name:it.giftName?("生日禮｜"+it.giftName):"生日贈品", type:"gift", giftPid:it.giftPid||(it.giftKey?String(it.giftKey).split("|")[0]:""), giftKey:it.giftKey||"", giftName:it.giftName||"贈品", giftPrice:(it.giftPrice!=null&&it.giftPrice!=="")?Number(it.giftPrice):null, giftDiscount:it.giftDiscount||0, min:0}));
+      }
+      granted++;
+    }
+    alert("完成！本月壽星 "+stars.length+" 人：新發 "+granted+" 人、已領過跳過 "+skipped+" 人。");
+  }catch(e){ console.error("補發生日禮失敗", e); alert("補發失敗："+(e.message||"")); }
+};
+
 let SHOPINFO = [];
 function shopBlockLabel(t){ return t==="info"?"基本資訊":t==="video"?"影片":t==="photo"?"照片":"文字"; }
 function shopBlockCard(b,i){
@@ -1577,6 +1767,7 @@ $("btn-save-set").onclick = async ()=>{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
     /* 註冊禮存全店設定 settings/global */
     GLOBAL.signupGift = collectSignupGift();
+    GLOBAL.birthdayGift = (typeof collectBirthdayGift==="function")? collectBirthdayGift() : (GLOBAL.birthdayGift||{on:false,days:30,items:[]});
     GLOBAL.pointRule = { on: !!($("sw-pointrule")||{}).classList?.contains("on"),
       spendPer: num("pr-spend")||100, ptsGet: num("pr-pts")||1 };
     GLOBAL.referral = { on: !!($("sw-referral")||{}).classList?.contains("on"),
@@ -1605,6 +1796,7 @@ $("btn-save-set").onclick = async ()=>{
     var _redeem = (typeof REDEEM_CATALOG!=="undefined")? REDEEM_CATALOG : (GLOBAL.redeemCatalog||[]);
     await setDoc(doc(db,"settings","global"), {
       signupGift: GLOBAL.signupGift,
+      birthdayGift: GLOBAL.birthdayGift,
       pointRule:  GLOBAL.pointRule,
       referral:   GLOBAL.referral,
       shopInfo:   { blocks: SHOPINFO },
@@ -1617,7 +1809,7 @@ $("btn-save-set").onclick = async ()=>{
     GLOBAL.addonGroups = JSON.parse(JSON.stringify(_agClean)); if(typeof ADDONS!=="undefined") ADDONS = JSON.parse(JSON.stringify(_agClean)); GLOBAL.orderAddonTitle = _oaTitle;
     GLOBAL.levels = _levels; if(typeof LEVELS_EDIT!=="undefined") LEVELS_EDIT = JSON.parse(JSON.stringify(_levels));
     GLOBAL.redeemCatalog = JSON.parse(JSON.stringify(_redeem));
-    renderSignupGift(); renderShopInfo(); if(typeof renderAddonList==="function") renderAddonList();
+    renderSignupGift(); if(typeof renderBirthdayGift==="function") renderBirthdayGift(); renderShopInfo(); if(typeof renderAddonList==="function") renderAddonList();
     if(typeof renderLevelsList==="function") renderLevelsList(); if(typeof renderRedeemList==="function") renderRedeemList();
     toast("已儲存（" + cur.n + "）");
   }catch(e){
