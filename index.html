@@ -1468,6 +1468,11 @@ async function grantSignupGift(uid, m){
     if(typeof newPts === "number") m.points = newPts;   /* 讓下面 member 用到更新後點數 */
   }
 }
+async function grantBirthdayGift(uid){
+  const bg = (SETTINGS && SETTINGS.birthdayGift) || {};
+  if(!bg.on || !(Array.isArray(bg.items) && bg.items.length)) return;
+  if(window.fbGrantBirthday){ await window.fbGrantBirthday(uid, bg, new Date().getFullYear()); }
+}
 window.onMemberLogin = async (uid, m)=>{
   authReady = true;
   const mask = document.getElementById("loading-mask");
@@ -1488,6 +1493,16 @@ window.onMemberLogin = async (uid, m)=>{
   }catch(e){ console.error("發放註冊禮失敗", e); }
   await refreshMyOrders();
   await refreshCoupons();
+  /* 生日禮：生日當月自動發放一次（每年只發一次，用 bday/bdayYear 記號判斷） */
+  try{
+    await settingsReady;
+    const bg = (SETTINGS && SETTINGS.birthdayGift) || {};
+    if(bg.on && isBirthMonth()){
+      const yr = new Date().getFullYear();
+      const already = (MY_CP||[]).some(function(c){ return c.bday===true && c.bdayYear===yr; });
+      if(!already){ await grantBirthdayGift(uid); await refreshCoupons(); }
+    }
+  }catch(e){ console.error("發放生日禮失敗", e); }
   renderMember();
   const cur = document.querySelector(".page.show");
   if(!cur || cur.id === "p-login") go("p-member");
@@ -2195,6 +2210,24 @@ if(cfg.apiKey && cfg.projectId){
       if(!granted) return undefined;
       await setDoc(doc(db,"members",uid), memberPatch, {merge:true});
       return memberPatch.points;
+    };
+
+    /* 發放生日禮：生日當月自動發（source:signup 過規則＋bday/bdayYear 記號給每年只發一次用） */
+    window.fbGrantBirthday = async (uid, bg, yr)=>{
+      if(!bg || !Array.isArray(bg.items) || !bg.items.length) return;
+      const days = bg.days || 30;
+      const exp = new Date(); exp.setDate(exp.getDate() + days);
+      const expStr = exp.getFullYear()+"-"+String(exp.getMonth()+1).padStart(2,"0")+"-"+String(exp.getDate()).padStart(2,"0");
+      for(const it of bg.items){
+        const base = {uid, expire: expStr, used:false, source:"signup", bday:true, bdayYear: yr, createdAt: serverTimestamp()};
+        if(it.type==="amount"){
+          await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name: it.name||"生日折價券", type:"amount", value: it.value||0, min: it.min||0}));
+        } else if(it.type==="percent"){
+          await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name: it.name||"生日折扣券", type:"percent", value: it.value||0, min: it.min||0}));
+        } else if(it.type==="gift"){
+          await addDoc(collection(db,"usercoupons"), Object.assign({}, base, {name: it.giftName? ("生日禮｜"+it.giftName):"生日贈品", type:"gift", giftPid: it.giftPid||(it.giftKey? String(it.giftKey).split("|")[0]:""), giftKey: it.giftKey||"", giftName: it.giftName||"贈品", giftPrice: (it.giftPrice!=null && it.giftPrice!=="")? Number(it.giftPrice) : null, giftDiscount: it.giftDiscount||0, min:0}));
+        }
+      }
     };
 
     /* 點數兌換：發一張券到 usercoupons(source:redeem)並扣點，兩件事用 batch 一起成敗，避免扣了點卻沒發券 */
