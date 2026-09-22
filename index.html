@@ -689,8 +689,10 @@ function AGROUPS(){ return (SETTINGS && Array.isArray(SETTINGS.addonGroups))? SE
 function groupById(gid){ return AGROUPS().find(function(g){ return g.id===gid; }); }
 function aesc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
 function itemAddonGroups(it){ return (it && Array.isArray(it.addons))? AGROUPS().filter(function(g){ return g.scope==="item" && it.addons.indexOf(g.id)>-1; }) : []; }
+function catOf(id){ for(var i=0;i<PRODUCTS.length;i++){ var s=PRODUCTS[i]; for(var j=0;j<s.items.length;j++){ if(s.items[j].id===id) return s.cat; } } return ""; }
+function cartHasCat(cats){ if(!cats || !cats.length) return true; for(var k in cart){ if(!(cart[k]>0)) continue; var id=k.split("|")[0]; if(cats.indexOf(catOf(id))>-1) return true; } return false; }
 function orderAddonGroups(){
-  return AGROUPS().filter(function(g){ return g.scope==="order"; });
+  return AGROUPS().filter(function(g){ return g.scope==="order" && cartHasCat(g.cats); });
 }
 function optOn(sel,g,oi){ if(sel==null) return false; return g.mode==="one"? (sel===oi) : !!(sel && sel[oi]); }
 function selSum(sel,g){ var s=0; if(sel==null) return 0; if(g.mode==="one"){ if(typeof sel==="number" && g.opts[sel]) s+=(g.opts[sel].p||0); } else { for(var oi in sel){ if(sel[oi] && g.opts[oi]) s+=(g.opts[oi].p||0); } } return s; }
@@ -721,7 +723,10 @@ function itemAddonHTML(it){
 }
 function orderAddonHTML(){
   var ogs=orderAddonGroups(); if(!ogs.length) return "";
-  return ogs.map(function(g){ var sel=ORDERSEL[g.id];
+  var title=((SETTINGS.orderAddonTitle||"").trim())||"滷味加料";
+  var head='<div style="margin:20px 16px 2px;font-size:16.5px;font-weight:800;color:var(--wine);">🥘 '+aesc(title)+'</div>'
+    +'<div style="margin:0 16px 8px;font-size:12px;color:var(--ink-soft);">你點了滷味，請挑選搭配的醬料</div>';
+  return head+ogs.map(function(g){ var sel=ORDERSEL[g.id];
     return '<div class="f-sec" style="margin:16px 16px 8px;">'+aesc(g.name)+(g.mode==="one"?"【擇一】":"【可複選】")+(g.req?"（必選）":"")+'</div>'
       +'<div class="sauce" style="margin:0 16px;">'+g.opts.map(function(o,oi){ var on=optOn(sel,g,oi);
         return '<label class="'+(on?"on":"")+'" onclick="toggleOrderSel(\''+g.id+'\','+oi+')"><span class="ck'+(g.mode==="one"?" r":"")+'">'+(on?"✓":"")+'</span><span style="flex:1;">'+aesc(o.n)+'</span>'+(o.p>0?'<span style="font-size:12px;color:var(--ink-soft);">＋$'+o.p+'</span>':'')+'</label>';
@@ -1191,7 +1196,7 @@ async function pay(){
     const igs=itemAddonGroups(it); const isel=ITEMSEL[id]||{};
     const adLines=[]; let adPrice=0;
     igs.forEach(function(g){ const nm=selNames(isel[g.id],g); if(nm.length){ adLines.push(g.name+"："+nm.join("、")); adPrice+=selSum(isel[g.id],g); } });
-    const o={name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:(va.p||0)+adPrice};
+    const o={name: it.n + (va.v? "（"+va.v+"）":""), qty:q, price:(va.p||0)+adPrice, cat: catOf(id)};
     if(adLines.length) o.addons=adLines;
     return o;
   });
