@@ -909,6 +909,8 @@ function nav(t){
 }
 /* 店家設定：從資料庫 settings/shop 載入；載入前用保守預設（僅自取＋現金） */
 let SETTINGS = { pickupOpen:true, deliveryOpen:false, onlinePayOpen:false, annOn:false, annText:"", annImage:"", offDates:[], sauces:["招牌蒜蓉醬","原味老滷","微甜辣老滷"], levels:[], redeemCatalog:[], pointRule:{on:false,spendPer:100,ptsGet:1}, referral:{on:false} };
+/* 邀請好友：進站若帶 ?ref=CODE，先存起來，登入後再套用（發券由後端函式處理） */
+try{ var _refParam = new URLSearchParams(location.search).get("ref"); if(_refParam){ localStorage.setItem("sdc_pendingRef", String(_refParam).trim().toUpperCase()); } }catch(e){}
 /* 設定載入完成的信號：發放註冊禮前要等它，避免讀到舊/空設定而發錯 */
 let _settingsReadyResolve;
 const settingsReady = new Promise(res => { _settingsReadyResolve = res; });
@@ -1503,6 +1505,22 @@ window.onMemberLogin = async (uid, m)=>{
       if(!already){ await grantBirthdayGift(uid); await refreshCoupons(); }
     }
   }catch(e){ console.error("發放生日禮失敗", e); }
+  /* 邀請好友：帶邀請碼進站且尚未綁定 → 呼叫後端綁定並立刻發「好友首購禮」給好友 */
+  try{
+    await settingsReady;
+    const rf = (SETTINGS && SETTINGS.referral) || {};
+    let pend = ""; try{ pend = localStorage.getItem("sdc_pendingRef") || ""; }catch(e){}
+    if(rf.on && pend && window.fbClaimReferral){
+      const res = await window.fbClaimReferral(pend);
+      if(res && res.ok){
+        try{ localStorage.removeItem("sdc_pendingRef"); }catch(e){}
+        await refreshCoupons();
+        setTimeout(function(){ alert("邀請碼已套用！「" + (res.refereeName||"好友首購禮") + "」已放進你的優惠券 🎁"); }, 500);
+      } else if(res && (res.reason==="already" || res.reason==="self" || res.reason==="notnew" || res.reason==="badcode")){
+        try{ localStorage.removeItem("sdc_pendingRef"); }catch(e){}   /* 這些情況不再重試 */
+      }
+    }
+  }catch(e){ console.error("套用邀請碼失敗", e); }
   renderMember();
   const cur = document.querySelector(".page.show");
   if(!cur || cur.id === "p-login") go("p-member");
@@ -1727,10 +1745,15 @@ window.doRedeemPoint = async function(idx){
   }catch(e){ console.error("兌換失敗", e); alert("兌換失敗：" + (e.message||e)); }
 };
 async function ensureRefCode(){
-  if(!member || member.refCode) return;
-  const code = (member.docId||"").slice(-6).toUpperCase() || Math.random().toString(36).slice(2,8).toUpperCase();
-  try{ await updateDoc(doc(db,"members",member.docId), { refCode: code }); member.refCode = code; }
-  catch(e){ console.error("建立邀請碼失敗", e); }
+  if(!member) return;
+  var el = document.getElementById("my-refcode");
+  if(member.refCode){ if(el) el.textContent = member.refCode; return; }
+  try{
+    if(window.fbGetRefCode){
+      var r = await window.fbGetRefCode();
+      if(r && r.code){ member.refCode = r.code; if(el) el.textContent = r.code; }
+    }
+  }catch(e){ console.error("建立邀請碼失敗", e); if(el) el.textContent = "產生失敗，請稍後再試"; }
 }
 window.copyInviteLink = function(){
   if(!member || !member.refCode){ alert("邀請碼尚未準備好，請稍候再試"); return; }
@@ -2031,6 +2054,13 @@ if(cfg.apiKey && cfg.projectId){
     const auth = getAuth(app);
     window.fbAuth = auth;
     window.fbSignOut = ()=> signOut(auth);
+    /* 邀請好友：雲端函式（asia-east1）。getRefCode 產生/取回邀請碼；claimReferral 綁定並發好友首購禮 */
+    try{
+      const { getFunctions, httpsCallable } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js");
+      const functions = getFunctions(app, "asia-east1");
+      window.fbGetRefCode = async ()=>{ const r = await httpsCallable(functions, "getRefCode")(); return r.data; };
+      window.fbClaimReferral = async (code)=>{ const r = await httpsCallable(functions, "claimReferral")({ code }); return r.data; };
+    }catch(e){ console.error("邀請好友函式載入失敗", e); }
     const { runTransaction } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     window.fbNextSeq = async (dayKey)=>{
       const ref = doc(db, "counters", dayKey);
