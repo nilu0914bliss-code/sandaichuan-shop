@@ -2337,7 +2337,20 @@ function renderTicketImage(d){
   ctx.fillStyle = "#000";
   drawLabelValue(ctx, "訂購人", d.name, y, F_FOOT, PAD); y += 46;
   drawLabelValue(ctx, "電話", d.phone, y, F_FOOT, PAD); y += 46;
-  if(d.note){ drawLabelValue(ctx, "備註", d.note, y, F_FOOT, PAD); y += 46; }
+  if(d.note){
+    /* 備註可能很長：標籤獨立一行，內容用整個紙寬自動換行印完整，不再被切掉 */
+    ctx.font = F_FOOT; ctx.fillStyle = "#000"; ctx.textAlign = "left";
+    ctx.fillText("備註：", PAD, y); y += 40;
+    String(d.note).split(/\r?\n/).forEach(function(seg){
+      if(seg === ""){ return; }
+      wrapSmart(ctx, seg, F_FOOT, W - PAD * 2).forEach(function(ln){
+        ctx.font = F_FOOT; ctx.fillStyle = "#000"; ctx.textAlign = "left";
+        ctx.fillText(ln, PAD, y);
+        y += 40;
+      });
+    });
+    y += 6;
+  }
 
   /* 下單時間 */
   y += 10; drawDashed(ctx, PAD, y, W-PAD, y, 1); y += 14;
