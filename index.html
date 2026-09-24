@@ -1434,7 +1434,7 @@ function memberEntry(){
 }
 const FN = "https://asia-east1-sandaichuan-tw.cloudfunctions.net";
 const LINE_CHANNEL_ID = "2010810194";
-const REDIRECT_URI = "https://nilu0914bliss-code.github.io/sandaichuan-shop/";  /* 寫死成 LINE 後台登記的乾淨網址（含結尾斜線），避免少斜線/帶參數時 400 */
+const REDIRECT_URI = "https://nilu0914bliss-code.github.io/sandaichuan-shop/";  /* 固定成 LINE 唯一登記的乾淨網址：不論客人從 / 、/index.html 、無斜線或帶?ref 進來，登入一律送這個，避免 400 */
 function lineAuth(){
   if(!window.fbAuth){ alert("系統尚未連線，請稍後再試。"); return; }
   const state = Math.random().toString(36).slice(2);
