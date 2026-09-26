@@ -288,12 +288,12 @@
 
   <div class="view show" id="v-orders">
     <div class="stats">
-      <div class="stat"><div class="num" id="st-todo">0</div><div class="lb">今日待處理</div></div>
+      <div class="stat"><div class="num" id="st-todo">0</div><div class="lb">待處理</div></div>
       <div class="stat"><div class="num" id="st-wait">0</div><div class="lb">預購單</div></div>
       <div class="stat"><div class="num" id="st-today">0</div><div class="lb">今日新單</div></div>
     </div>
     <div class="tabs">
-      <button class="tab on" data-st="today">今日待處理</button>
+      <button class="tab on" data-st="today">待處理</button>
       <button class="tab" data-st="pre">預購單</button>
       <button class="tab" data-st="done">已結帳</button>
       <button class="tab" data-st="cancelled">已取消</button>
@@ -2127,15 +2127,22 @@ function wrapSmart(ctx, text, font, maxW){
     else if(depth===0 && "、，：；。！".indexOf(ch)>-1){ segs.push(cur); cur=""; }
   }
   if(cur!=="") segs.push(cur);
+  var NOSTART = "，。、！？：；）」』】)]}．";   /* 禁則：這些標點不可出現在行首 */
   var lines=[], line="";
   function pushSeg(s){
     if(line===""){
       if(ctx.measureText(s).width<=maxW){ line=s; return; }
       var t="";
-      for(var j=0;j<s.length;j++){ if(t!=="" && ctx.measureText(t+s[j]).width>maxW){ lines.push(t); t=s[j]; } else { t+=s[j]; } }
+      for(var j=0;j<s.length;j++){
+        if(t!=="" && ctx.measureText(t+s[j]).width>maxW){
+          if(NOSTART.indexOf(s[j])>-1 && t.length>1){ lines.push(t.slice(0,-1)); t=t.slice(-1)+s[j]; }  /* 標點禁行首：把前一字一起帶下去 */
+          else { lines.push(t); t=s[j]; }
+        } else { t+=s[j]; }
+      }
       line=t; return;
     }
     if(ctx.measureText(line+s).width<=maxW){ line+=s; }
+    else if(NOSTART.indexOf(s[0])>-1 && line.length>1){ var _lc=line.slice(-1); lines.push(line.slice(0,-1)); line=_lc; pushSeg(s); }  /* 該段以標點開頭：也把前一字帶下去，避免標點在行首 */
     else { lines.push(line); line=""; pushSeg(s); }
   }
   for(var q=0;q<segs.length;q++) pushSeg(segs[q]);
@@ -2556,17 +2563,17 @@ function renderOrders(){
   const tISO0 = todayStr();
   const MINE = ORDERS.filter(inMyShop);
   const activeM = MINE.filter(o=>!isDone(o)&&!isCancelled(o));
-  $("st-todo").textContent = activeM.filter(o=>o.type==="pickup"&&o.pickup&&o.pickup.date===tISO0).length;
-  $("st-wait").textContent = activeM.filter(o=>!(o.type==="pickup"&&o.pickup&&o.pickup.date===tISO0)).length;
+  $("st-todo").textContent = activeM.filter(o=>o.type==="pickup"&&o.pickup&&o.pickup.date<=tISO0).length;
+  $("st-wait").textContent = activeM.filter(o=>!(o.type==="pickup"&&o.pickup&&o.pickup.date<=tISO0)).length;
   const tISO = todayStr();
   $("st-today").textContent = MINE.filter(o=>o.createdAt && o.createdAt.toDate && isoLocalDate(o.createdAt.toDate())===tISO).length;
 
   const show = MINE.map(o=>({o})).filter(({o})=>{
     const t = todayStr();
     const active = !isDone(o) && !isCancelled(o);
-    // 今日待處理：自取且取貨日=今天。宅配一律進預購單（待出貨）。
-    const isTodayOrder = active && o.type==="pickup" && o.pickup && o.pickup.date === t;
-    // 預購單：今天以後的自取、還沒到的、以及所有宅配
+    // 今日待處理：自取且取貨日「今天(含)以前」（含昨天以前逾期未結的）。宅配一律進預購單（待出貨）。
+    const isTodayOrder = active && o.type==="pickup" && o.pickup && o.pickup.date <= t;
+    // 預購單：只有「未來日期」的自取、以及所有宅配（今天以前的都改進今日待處理）
     const isPre = active && !isTodayOrder;
     const stOK = stF==="all" || (stF==="today"&&isTodayOrder) || (stF==="pre"&&isPre)
       || (stF==="done"&&isDone(o)) || (stF==="cancelled"&&isCancelled(o));
@@ -2581,6 +2588,7 @@ function renderOrders(){
     const st = ST_LABEL[o.status] || [o.status,"wait"];
     const isPk = o.type==="pickup";
     const pkToday = isPk && o.pickup && o.pickup.date===todayStr();
+    const pkOverdue = isPk && o.pickup && o.pickup.date < todayStr() && !isDone(o) && !isCancelled(o);
     return `<div class="order ${isCancelled(o)?"cancelled":""} ${openSet.has(id)?"open":""}" id="o-${id}">
       <div class="o-head" onclick="toggleO('${id}')">
         <div>
@@ -2589,7 +2597,7 @@ function renderOrders(){
         </div>
         <div class="fill"></div>
         <span class="badge ${isPk?"type-p":"type-d"}">${isPk?"自取":"宅配"}</span>
-        ${isPk? `<span class="badge ${pkToday?"today":"pre"}">${pkToday?"今日單":"預購單"}</span>`:""}
+        ${isPk? (pkOverdue? `<span class="badge" style="background:#C8351F;color:#fff;">逾期</span>` : `<span class="badge ${pkToday?"today":"pre"}">${pkToday?"今日單":"預購單"}</span>`):""}
         <span class="badge ${st[1]}">${st[0]}</span>
       </div>
       <div class="o-body">
