@@ -1115,12 +1115,14 @@ function renderPayOpts(){
   }
   $("pay-opts").innerHTML = s.opts.map(o=>{
     const d = dis.includes(o[0]);
-    return `<label class="${d?"dim":""}"><input type="radio" name="payway" value="${o[0]}" ${payway===o[0]?"checked":""} ${d?"disabled":""} onchange="payway=this.value;syncPayBtn()"> ${o[1]}${d?'<span class="soon">尚未開放</span>':""}</label>`;
+    return `<label class="${d?"dim":""}"><input type="radio" name="payway" value="${o[0]}" ${payway===o[0]?"checked":""} ${d?"disabled":""} onchange="setPayway(this.value)"> ${o[1]}${d?'<span class="soon">尚未開放</span>':""}</label>`;
   }).join("");
   $("pay-hint").textContent = chOnlinePay()? s.hint : "目前開放現金取貨付款；線上付款即將開放";
   syncPayBtn();
 }
 function syncPayBtn(){ $("pay-btn").textContent = payway==="cash"? "送出訂單":"前往付款"; }
+/* 修正：radio 的 name 是 payway，行內 onchange 內的 payway 會被解析成 <form> 的同名欄位而不是這個全域變數，導致點信用卡後 payway 仍停在 cash。改走函式，函式內的 payway 才是全域變數。 */
+function setPayway(v){ payway = v; syncPayBtn(); }
 function openCheckout(){
   if(!requireLogin()) return;
   /* 必填加料檢查（整單＋品項） */
