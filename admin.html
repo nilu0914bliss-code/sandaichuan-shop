@@ -404,8 +404,9 @@
           <span class="sbadge" id="badge-pay"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
-          <div class="sw-row"><span class="l">信用卡 / LINE Pay</span><button class="switch" id="sw-onlinePay"></button></div>
-          <div class="hint">開啟後，此通路的客人可選線上付款。金流部署完成前請保持關閉。</div>
+          <div class="sw-row"><span class="l">信用卡（刷卡）</span><button class="switch" id="sw-onlinePay"></button></div>
+          <div class="sw-row"><span class="l">LINE Pay</span><button class="switch" id="sw-payLine"></button></div>
+          <div class="hint">信用卡／LINE Pay 可各自獨立開關。⚠️ LINE Pay 需先另向藍新申請開通再開，否則客人點了會付款失敗。</div>
         </div></div>
       </div>
 
@@ -1098,6 +1099,7 @@ function curSet(){
   if(s.tEndH===undefined) s.tEndH = s.tEnd;
   if(s.tGapH===undefined) s.tGapH = s.tGap;
   if(s.onlinePay===undefined) s.onlinePay = false;
+  if(s.payLine===undefined) s.payLine = false;
   return s;
 }
 /* 為了沿用既有函式，SHOP 指向目前通路 */
@@ -1416,11 +1418,13 @@ function renderSettings(){
   ba.classList.toggle("on", !!s.annOn);
   $("ann-input").value = s.annText || "";
 
-  // 線上付款（各通路）
+  // 線上付款（各通路）：信用卡 / LINE Pay 各自獨立
   $("sw-onlinePay").classList.toggle("on", !!s.onlinePay);
+  $("sw-payLine").classList.toggle("on", !!s.payLine);
   const bp = $("badge-pay");
-  bp.textContent = s.onlinePay? "開放中":"已關閉";
-  bp.classList.toggle("on", !!s.onlinePay);
+  const _pon = []; if(s.onlinePay) _pon.push("刷卡"); if(s.payLine) _pon.push("LINE Pay");
+  bp.textContent = _pon.length? _pon.join("＋"):"已關閉";
+  bp.classList.toggle("on", _pon.length>0);
 
   renderCpCh();
 
@@ -1440,6 +1444,7 @@ function renderSettings(){
 $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); renderSettings(); };
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
 $("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
+$("sw-payLine").onclick = ()=>{ const s=curSet(); s.payLine = !s.payLine; renderSettings(); };
 $("sw-signup").onclick = ()=>{ const sw=$("sw-signup"); sw.classList.toggle("on"); };
 if($("sw-birthday")) $("sw-birthday").onclick = ()=>{ const sw=$("sw-birthday"); sw.classList.toggle("on"); renderBirthdayBadge(); };
 if($("sw-pointrule")) $("sw-pointrule").onclick = ()=>{ $("sw-pointrule").classList.toggle("on"); };
