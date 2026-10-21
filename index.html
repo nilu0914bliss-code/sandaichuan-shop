@@ -590,15 +590,15 @@ const CH = [
 let MY_CH = "";
 try{ MY_CH = localStorage.getItem("sdc_ch") || ""; }catch(e){}
 const curCh = () => CH.find(c=>c.k===MY_CH) || null;
-function chSet(k){ return (SETTINGS.ch && SETTINGS.ch[k]) || {open:true, annOn:false, annText:"", annImage:"", offDates:[], onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20}; }
+function chSet(k){ return (SETTINGS.ch && SETTINGS.ch[k]) || {open:true, annOn:false, annText:"", annImage:"", offDates:[], onlinePay:false, payLine:false, tStart:"06:00", tEnd:"12:30", tGap:20}; }
 function chOpen(k){
   const s = chSet(k);
   if(s.open === false) return false;
   const c = CH.find(x=>x.k===k);
-  if(c && c.type==="delivery" && !s.onlinePay) return false;
+  if(c && c.type==="delivery" && !(s.onlinePay||s.payLine)) return false;
   return true;
 }
-function chOnlinePay(){ return MY_CH? !!chSet(MY_CH).onlinePay : false; }
+function chOnlinePay(){ if(!MY_CH) return false; var s=chSet(MY_CH); return !!(s.onlinePay||s.payLine); }
 
 function shipRule(){
   const s = (MY_CH && typeof chSet==="function") ? chSet(MY_CH) : null;
@@ -1100,7 +1100,7 @@ const PAY_SETS = {
   pickup:{opts:[["card","信用卡"],["linepay","LINE Pay"],["cash","現金（取貨時付款）"]], def:"cash",
     hint:"信用卡／LINE Pay 走藍新線上付款、自動確認；現金請於取貨時支付"}
 };
-const PAY_DISABLED = () => chOnlinePay()? [] : ["card","linepay"];
+const PAY_DISABLED = () => { var s=MY_CH?chSet(MY_CH):{}; var d=[]; if(!s.onlinePay) d.push("card"); if(!s.payLine) d.push("linepay"); return d; };
 function renderPayOpts(){
   const s = PAY_SETS[shipMethod];
   const dis = PAY_DISABLED();
@@ -2132,7 +2132,7 @@ if(cfg.apiKey && cfg.projectId){
       for(const c of CH){
         const cs = await getDoc(doc(db, "settings", "ch_"+c.k));
         chMap[c.k] = Object.assign({open:true, annOn:false, annText:"", annImage:"", offDates:[],
-                                    onlinePay:false, tStart:"06:00", tEnd:"12:30", tGap:20},
+                                    onlinePay:false, payLine:false, tStart:"06:00", tEnd:"12:30", tGap:20},
                                    cs.exists()? cs.data() : {});
         console.log("通路", c.k, "讀到 open =", cs.exists()? cs.data().open : "(文件不存在)");
       }
