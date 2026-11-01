@@ -2035,6 +2035,8 @@ function buildTicket(o){
     type: o.type,
     pickup: o.pickup || null,
     store: o.store || null,
+    shipMode: o.shipMode || "cvs",
+    address: o.address || "",
     items: o.items || [],
     shipFee: o.shipFee || 0,
     couponDiscount: o.couponDiscount || 0,
@@ -2243,8 +2245,15 @@ function renderTicketImage(d){
     ctx.fillText(slotStr, tx, y);
     y += 50;
   } else {
-    left("7-11 " + ((d.store&&d.store.city)||"") + " " + ((d.store&&d.store.name)||""), F_TIME);
-    y += 44;
+    if(d.shipMode==="home"){
+      left("宅配到府", F_TIME);
+      y += 44;
+      const ad = String(d.address||"");
+      for(let k=0;k<ad.length;k+=14){ left(ad.slice(k,k+14), F_BODY); y += 38; }
+    } else {
+      left("7-11 " + ((d.store&&d.store.city)||"") + " " + ((d.store&&d.store.name)||""), F_TIME);
+      y += 44;
+    }
   }
   y += 24;
 
@@ -2618,7 +2627,7 @@ function renderOrders(){
         </div>
         <div class="o-sec">加料（整單）</div><div class="o-line">${o.sauce? esc(o.sauce) : "—"}</div>
         <div class="o-sec">${isPk?"取貨資訊":"收件資訊"}</div>
-        <div class="o-line"><b>${o.name||""}</b>　${o.phone||""}<br>${isPk? (o.pickup? o.pickup.market+"市場 · "+(o.pickup.date||"")+" "+(o.pickup.slot||"") : "—") : (o.store? "7-11 "+o.store.city+"・"+o.store.name : "—")}</div>
+        <div class="o-line"><b>${o.name||""}</b>　${o.phone||""}<br>${isPk? (o.pickup? o.pickup.market+"市場 · "+(o.pickup.date||"")+" "+(o.pickup.slot||"") : "—") : (o.shipMode==="home"? "宅配到府 · "+esc(o.address||"—") : (o.store? "7-11 "+o.store.city+"・"+o.store.name : "—"))}</div>
         ${o.note? `<div class="o-sec">備註</div><div class="o-line">${o.note}</div>`:""}
         <div class="o-sec">目前狀態</div><div class="o-line">${st[0]}</div>
         <div style="display:flex;gap:8px;margin-top:8px;">
@@ -2631,8 +2640,8 @@ function renderOrders(){
           : isDone(o)
             ? `<div class="done-info">${o.status==="shipped"? "已出貨 · 宅配單號 "+(o.track||"") : "已取貨完成"+(o.payMethod==="cash"?" · 現金收訖":"")}</div>`
             : (o.type==="delivery"
-              ? `<div class="track"><input id="trk-${id}" placeholder="輸入 7-11 冷凍交貨便單號"><button class="btn btn-w" onclick="shipOrder('${id}')">標記出貨</button></div>
-                 <div class="hint">到 7-11 系統建立冷凍寄件後，把單號填回這裡</div>`
+              ? `<div class="track"><input id="trk-${id}" placeholder="${o.shipMode==='home'? '輸入宅配單號' : '輸入 7-11 冷凍交貨便單號'}"><button class="btn btn-w" onclick="shipOrder('${id}')">標記出貨</button></div>
+                 <div class="hint">${o.shipMode==='home'? '寄出冷凍宅配後，把單號填回這裡' : '到 7-11 系統建立冷凍寄件後，把單號填回這裡'}</div>`
               : `<button class="btn btn-w" onclick="pickupDone('${id}')">${o.payMethod==="cash"? "標記已取貨・現金收訖 "+money(o.total):"標記已取貨"}</button>`)}
       </div>
     </div>`;
