@@ -422,13 +422,25 @@
     <div class="field" id="email-field"><label>Email</label><input id="f-email" type="email" placeholder="付款收據寄送用（選填）"></div>
 
     <div id="ship-fields">
+    <div class="f-sec">配 送 方 式</div>
+    <div class="sauce" id="smode-opts">
+      <label><input type="radio" name="smode" value="home" checked onchange="setShipMode(this.value)"> 宅配到府</label>
+      <label><input type="radio" name="smode" value="cvs" onchange="setShipMode(this.value)"> 7-11 冷凍店到店</label>
+    </div>
+    <div class="hint" style="margin:6px 0 10px;">訂單於付款後 2～3 天內寄出，單號會更新於「會員中心」。冷凍運費 NT$ 160、滿 NT$ 1,000 免運（暫定，依店家確認調整）</div>
+    <div id="home-fields">
+      <div class="field"><label>收件地址 *</label><input id="f-addr" placeholder="縣市、區、路名、門牌、樓層" autocomplete="street-address">
+        <div class="hint">請填完整地址；收件人為上方訂購人，冷凍商品請確認當天有人可收件</div>
+      </div>
+    </div>
+    <div id="cvs-fields" style="display:none;">
     <div class="f-sec">取 貨 門 市（7-11 冷凍店到店）</div>
-    <div class="hint" style="margin:-2px 0 10px;">宅配訂單於付款後 2～3 天內寄出，宅配單號會更新於「會員中心」。冷凍運費 NT$ 160、滿 NT$ 1,000 免運（暫定，依店家確認調整）</div>
     <div class="field"><label>縣市 *</label>
       <select id="f-city"><option value="">請選擇</option><option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option><option>台南市</option><option>高雄市</option><option>其他縣市</option></select>
     </div>
     <div class="field"><label>門市名稱 *</label><input id="f-store" placeholder="例：光復門市">
       <div class="hint">請確認該門市有提供「冷凍交貨便」服務（正式版會附門市查詢連結）</div>
+    </div>
     </div>
     </div>
 
@@ -585,7 +597,7 @@ const PRODUCTS = [
 const CH = [
   {k:"fs", n:"鳳山工協", type:"pickup", d:"市場自取・免運費", i:"🏪"},
   {k:"sm", n:"三民陽明", type:"pickup", d:"市場自取・免運費", i:"🏪"},
-  {k:"dl", n:"冷凍宅配", type:"delivery", d:"7-11 店到店", i:"🧊"}
+  {k:"dl", n:"冷凍宅配", type:"delivery", d:"宅配到府・7-11 店到店", i:"🧊"}
 ];
 let MY_CH = "";
 try{ MY_CH = localStorage.getItem("sdc_ch") || ""; }catch(e){}
@@ -992,6 +1004,14 @@ function applyShopSettings(d){
 let sauceSel = "";
 function setSauce(v){ sauceSel = v; const w = $("sauce-warn"); if(w) w.style.display = "none"; }
 let shipMethod = "delivery";
+let shipMode = "home";   /* 冷凍宅配：home＝宅配到府、cvs＝7-11 店到店 */
+function escAddr(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function setShipMode(v){
+  shipMode = (v==="cvs") ? "cvs" : "home";
+  const h=$("home-fields"), c=$("cvs-fields");
+  if(h) h.style.display = shipMode==="home" ? "block" : "none";
+  if(c) c.style.display = shipMode==="cvs" ? "block" : "none";
+}
 function applyShopUI(){
   const c = curCh();
   if(!c) return;
@@ -999,8 +1019,9 @@ function applyShopUI(){
   const ic = $("ck-ch-ic"), n = $("ck-ch-n"), d = $("ck-ch-d");
   if(ic) ic.textContent = c.i;
   if(n) n.textContent = c.n;
-  if(d) d.textContent = c.type==="pickup"? "市場自取・免運費" : "7-11 冷凍店到店";
+  if(d) d.textContent = c.type==="pickup"? "市場自取・免運費" : "宅配到府・7-11 店到店";
   $("ship-fields").style.display = c.type==="delivery"?"block":"none";
+  if(c.type==="delivery") setShipMode(shipMode);
   $("pickup-fields").style.display = c.type==="pickup"?"block":"none";
   const ef = $("email-field"); if(ef) ef.style.display = (c.type==="pickup")? "none":"block";
   if(c.type==="pickup"){ $("f-pmarket").value = c.n; }
@@ -1153,8 +1174,12 @@ async function pay(){
     if(!$("f-pdate").value) need.push(["f-pdate","請選擇取貨日期"]);
     if(!$("f-ptime").value) need.push(["f-ptime","請選擇取貨時段"]);
   } else {
-    if(!$("f-city").value) need.push(["f-city","請選擇宅配縣市"]);
-    if(!$("f-store").value.trim()) need.push(["f-store","請填寫 7-11 門市名稱"]);
+    if(shipMode==="home"){
+      if($("f-addr").value.trim().length<8) need.push(["f-addr","請填寫完整收件地址（縣市、區、路名、門牌）"]);
+    } else {
+      if(!$("f-city").value) need.push(["f-city","請選擇宅配縣市"]);
+      if(!$("f-store").value.trim()) need.push(["f-store","請填寫 7-11 門市名稱"]);
+    }
   }
   if(need.length){
     const [fid, msg] = need[0];
@@ -1224,7 +1249,11 @@ async function pay(){
     couponGift: "",   /* 新做法：品項券直接折在購物車那份上（見 couponDiscount），不再另外掛一份贈品，避免師傅重複打包 */
     total: grand
   };
-  if(shipMethod==="delivery"){ order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
+  if(shipMethod==="delivery"){
+    order.shipMode = shipMode;
+    if(shipMode==="home"){ order.address = $("f-addr").value.trim(); }
+    else { order.store = {city:$("f-city").value, name:$("f-store").value.trim()}; }
+  }
   else { order.pickup = {market:$("f-pmarket").value, date:$("f-pdate").value, slot:$("f-ptime").value}; }
 
   const btn=$("pay-btn");
@@ -1561,7 +1590,7 @@ async function refreshMyOrders(){
       no: o.orderNo || "",
       time: d? `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}` : "",
       raw: o.status, type: o.type, payMethod: o.payMethod,
-      pickup: o.pickup || null, store: o.store || null,
+      pickup: o.pickup || null, store: o.store || null, shipMode: o.shipMode || "cvs", address: o.address || "",
       track: o.track || "", sauce: o.sauce || "", note: o.note || "",
       shipFee: o.shipFee || 0, total: o.total || 0, pointsUsed: o.pointsUsed || 0,
       items: (o.items||[]).map(x=>[x.name, x.qty, x.price])
@@ -1582,7 +1611,7 @@ function fillCheckout(){
   if(member.email) $("f-email").value = member.email;
   $("bday-note").style.display = isBirthMonth()? "block":"none";
 }
-function clearCheckout(){ ["f-name","f-phone","f-email","f-store"].forEach(i=>$(i).value=""); $("f-city").value=""; $("bday-note").style.display="none"; }
+function clearCheckout(){ ["f-name","f-phone","f-email","f-store","f-addr"].forEach(i=>$(i).value=""); $("f-city").value=""; $("bday-note").style.display="none"; }
 function orderSum(o){
   const sub=o.items.reduce((s,x)=>s+x[1]*x[2],0);
   const _sr2=shipRule(); const ship=(_sr2.freeAt>0 && sub>=_sr2.freeAt)?0:_sr2.fee;
@@ -1912,14 +1941,14 @@ function openOrder(i){
         <span style="display:inline-block;font-size:13px;font-weight:800;padding:5px 14px;border-radius:3px;background:${si.c}1a;color:${si.c};">${si.t}</span>
       </div>
       ${o.raw==="pending_payment"? `<div class="hint" style="color:#C8351F;margin-top:8px;">此訂單尚未完成付款，請至結帳頁重新付款或聯繫店家。</div>`:""}
-      ${o.raw==="shipped"&&o.track? `<div class="track-info">宅配單號 ${o.track}<br><span style="font-size:11.5px;font-weight:400;">可至 7-11 官網查詢包裹進度</span></div>`:""}
+      ${o.raw==="shipped"&&o.track? `<div class="track-info">宅配單號 ${o.track}<br><span style="font-size:11.5px;font-weight:400;">${o.shipMode==="home"? "可使用單號向物流公司查詢包裹進度" : "可至 7-11 官網查詢包裹進度"}</span></div>`:""}
     </div>
 
     <div class="m-sec">${o.type==="pickup"? "取 貨 資 訊":"配 送 資 訊"}</div>
     <div class="m-card" style="font-size:14px;line-height:2;">
       ${o.type==="pickup" && o.pickup
         ? `取貨市場　<b>${o.pickup.market||""}</b><br>取貨日期　<b>${fmtDate(o.pickup.date)}</b><br>取貨時段　<b>${o.pickup.slot||""}</b>`
-        : `配送方式　冷凍宅配（7-11 店到店）<br>取貨門市　<b>${(o.store&&o.store.city)||""}・${(o.store&&o.store.name)||""}</b><br><span style="font-size:12.5px;color:var(--ink-soft);">付款完成後 2～3 天出貨，宅配單號會更新於此頁</span>`}
+        : `${o.shipMode==="home" ? "配送方式　冷凍宅配到府<br>收件地址　<b>"+escAddr(o.address)+"</b><br>" : "配送方式　冷凍宅配（7-11 店到店）<br>取貨門市　<b>"+((o.store&&o.store.city)||"")+"・"+((o.store&&o.store.name)||"")+"</b><br>"}<span style="font-size:12.5px;color:var(--ink-soft);">付款完成後 2～3 天出貨，宅配單號會更新於此頁</span>`}
     </div>
 
     <div class="m-sec">訂 購 明 細</div>
