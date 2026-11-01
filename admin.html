@@ -413,11 +413,14 @@
       <!-- 運費設定（僅宅配通路顯示） -->
       <div class="scard" id="sc-ship" style="display:none;">
         <div class="scard-h" onclick="toggleCard('sc-ship',event)">
-          <i class="ic">🚚</i><span class="t">運費設定</span><span class="scope-tag scope-ch">此通路</span>
+          <i class="ic">🚚</i><span class="t">配送方式與運費</span><span class="scope-tag scope-ch">此通路</span>
           <span class="sbadge" id="badge-ship"></span><span class="arr">▾</span>
         </div>
         <div class="scard-b"><div class="inner">
-          <div class="hint" style="margin:0 0 10px;">宅配訂單的運費規則。自取通路免運，不會顯示這張卡。</div>
+          <div class="sw-row"><span class="l">7-11 冷凍店到店</span><button class="switch" id="sw-shipCvs"></button></div>
+          <div class="sw-row"><span class="l">宅配到府</span><button class="switch" id="sw-shipHome"></button></div>
+          <div class="hint" style="margin:0 0 12px;">兩種配送可各自開關；兩個都開，客人結帳時二選一；只開一個，客人就只看到那一種。兩個都關＝此通路暫停配送，客人無法下單。</div>
+          <div class="hint" style="margin:0 0 10px;">宅配訂單的運費規則（兩種配送共用）。自取通路免運，不會顯示這張卡。</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
             <span style="font-size:13px;color:var(--ink);">運費</span>
             <input type="number" id="ship-fee" min="0" value="160" style="width:100px;">
@@ -1434,7 +1437,13 @@ function renderSettings(){
       shipCard.style.display = "";
       setV("ship-fee", (s.shipFee!=null? s.shipFee : 160));
       setV("ship-free", (s.freeAt!=null? s.freeAt : 1000));
-      const bs = $("badge-ship"); if(bs){ bs.textContent = "$"+(s.shipFee!=null?s.shipFee:160); }
+      $("sw-shipCvs").classList.toggle("on", s.shipCvs!==false);
+      $("sw-shipHome").classList.toggle("on", !!s.shipHome);
+      const bs = $("badge-ship"); if(bs){
+        const _m=[]; if(s.shipCvs!==false) _m.push("店到店"); if(s.shipHome) _m.push("宅配");
+        bs.textContent = (_m.length? _m.join("＋") : "暫停配送") + " · $" + (s.shipFee!=null?s.shipFee:160);
+        bs.classList.toggle("on", _m.length>0);
+      }
       renderShipPreview();
     } else { shipCard.style.display = "none"; }
   }
@@ -1445,6 +1454,8 @@ $("sw-open").onclick = ()=>{ const s=curSet(); s.open = !(s.open!==false); rende
 $("sw-ann").onclick  = ()=>{ const s=curSet(); s.annOn = !s.annOn; renderSettings(); };
 $("sw-onlinePay").onclick = ()=>{ const s=curSet(); s.onlinePay = !s.onlinePay; renderSettings(); };
 $("sw-payLine").onclick = ()=>{ const s=curSet(); s.payLine = !s.payLine; renderSettings(); };
+$("sw-shipCvs").onclick = ()=>{ const s=curSet(); s.shipCvs = !(s.shipCvs!==false); renderSettings(); };
+$("sw-shipHome").onclick = ()=>{ const s=curSet(); s.shipHome = !s.shipHome; renderSettings(); };
 $("sw-signup").onclick = ()=>{ const sw=$("sw-signup"); sw.classList.toggle("on"); };
 if($("sw-birthday")) $("sw-birthday").onclick = ()=>{ const sw=$("sw-birthday"); sw.classList.toggle("on"); renderBirthdayBadge(); };
 if($("sw-pointrule")) $("sw-pointrule").onclick = ()=>{ $("sw-pointrule").classList.toggle("on"); };
@@ -1767,6 +1778,8 @@ $("btn-save-set").onclick = async ()=>{
   s.tGapH = +$("t-gapH").value || 20;
   if(($("sc-ship")||{}).style && $("sc-ship").style.display !== "none"){
     s.shipFee = num("ship-fee"); s.freeAt = num("ship-free");
+    if(s.shipCvs===undefined) s.shipCvs = true;
+    if(s.shipHome===undefined) s.shipHome = false;
   }
   try{
     await setDoc(doc(db,"settings","ch_"+EDIT_CH), s, {merge:true});
