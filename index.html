@@ -1476,7 +1476,7 @@ function memberEntry(){
 }
 const FN = "https://asia-east1-sandaichuan-tw.cloudfunctions.net";
 const LINE_CHANNEL_ID = "2010810194";
-const REDIRECT_URI = location.origin + location.pathname.replace(/[^/]*$/, "");  /* 自動跟著目前網址走：舊址github.io＝.../sandaichuan-shop/、新網域＝https://sandaichuan.com/，兩者都在LINE後台登記callback；會strip掉index.html與?query避免400 */
+const REDIRECT_URI = "https://sandaichuan.com/";  /* 自動跟著目前網址走：舊址github.io＝.../sandaichuan-shop/、新網域＝https://sandaichuan.com/，兩者都在LINE後台登記callback；會strip掉index.html與?query避免400 */
 function lineAuth(){
   if(!window.fbAuth){ alert("系統尚未連線，請稍後再試。"); return; }
   const state = Math.random().toString(36).slice(2);
@@ -2202,7 +2202,7 @@ if(cfg.apiKey && cfg.projectId){
       try{
         const r = await fetch("https://asia-east1-sandaichuan-tw.cloudfunctions.net/lineLogin", {
           method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ code: lineCode, redirectUri: location.origin + location.pathname.replace(/[^/]*$/, "") })
+          body: JSON.stringify({ code: lineCode, redirectUri: "https://sandaichuan.com/" })
         });
         const d = await r.json();
         if(d.token){ await signInWithCustomToken(auth, d.token); }
